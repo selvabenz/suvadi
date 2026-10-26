@@ -222,6 +222,10 @@ const STRINGS = {
   tvWaiting: { ta: 'தொலைபேசியிலிருந்து வசனத்திற்காகக் காத்திருக்கிறது…', en: 'Waiting for the phone…' },
   nextVerse: { ta: 'அடுத்த வசனம்', en: 'Next verse' },
   prevVerse: { ta: 'முந்தைய வசனம்', en: 'Previous verse' },
+  moreInSettings: { ta: 'மேலும் அமைப்புகளில்', en: 'More in Settings' },
+  recentRefs: { ta: 'சமீபத்திய வசனங்கள்', en: 'Recent references' },
+  recentSearches: { ta: 'சமீபத்திய தேடல்கள்', en: 'Recent searches' },
+  clearAll: { ta: 'அழி', en: 'Clear' },
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

@@ -44,6 +44,7 @@ interface Persisted {
   plan: PlanProgress | null;
   readDates: string[];
   history: Ref[];
+  searches: string[];
 }
 
 const DEFAULTS: Persisted = {
@@ -55,6 +56,7 @@ const DEFAULTS: Persisted = {
   plan: null,
   readDates: [],
   history: [],
+  searches: [],
 };
 
 function load(): Persisted {
@@ -91,6 +93,7 @@ class AppState {
   plan = $state<PlanProgress | null>(null);
   readDates = $state<string[]>([]);
   history = $state<Ref[]>([]);
+  searches = $state<string[]>([]);
 
   constructor() {
     const p = load();
@@ -102,6 +105,7 @@ class AppState {
     this.plan = p.plan;
     this.readDates = p.readDates;
     this.history = p.history;
+    this.searches = p.searches ?? [];
   }
 
   persist() {
@@ -115,6 +119,7 @@ class AppState {
         plan: $state.snapshot(this.plan),
         readDates: $state.snapshot(this.readDates),
         history: $state.snapshot(this.history),
+        searches: $state.snapshot(this.searches),
       };
       localStorage.setItem(KEY, JSON.stringify(data));
     } catch {
@@ -133,6 +138,24 @@ class AppState {
   pushHistory(ref: Ref) {
     const k = refKey(ref);
     this.history = [ref, ...this.history.filter((r) => refKey(r) !== k)].slice(0, 20);
+    this.persist();
+  }
+
+  /** Words searched, newest first (the last 20). */
+  pushSearch(q: string) {
+    const s = q.trim();
+    if (!s) return;
+    this.searches = [s, ...this.searches.filter((x) => x !== s)].slice(0, 20);
+    this.persist();
+  }
+
+  clearHistory() {
+    this.history = [];
+    this.persist();
+  }
+
+  clearSearches() {
+    this.searches = [];
     this.persist();
   }
 

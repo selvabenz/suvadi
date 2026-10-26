@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BookMeta, Lang, Ref } from '../types';
-  import { parseTypedRef } from '../refs';
+  import { formatRef, parseTypedRef } from '../refs';
+  import { app } from '../state.svelte';
   import type { BookIndex } from '../booknames';
   import { t } from '../i18n';
   import Sheet from './Sheet.svelte';
@@ -24,6 +25,7 @@
   let typed = $state('');
   let typedError = $state(false);
 
+  const recent = $derived(app.history.filter((r) => books.some((b) => b.code === r.book)).slice(0, 8));
   const ot = $derived(books.filter((b) => b.testament === 'ot'));
   const nt = $derived(books.filter((b) => b.testament === 'nt'));
   const title = $derived(
@@ -72,6 +74,14 @@
       <button class="btn primary" type="submit" disabled={!typed.trim()}>{t(lang, 'go')}</button>
     </form>
     {#if typedError}<p class="small err">{t(lang, 'refNotFound')}</p>{/if}
+    {#if recent.length}
+      <h3>{t(lang, 'recentRefs')}</h3>
+      <div class="recent">
+        {#each recent as r (r.book + r.ch + ':' + r.v)}
+          <button class="rc" onclick={() => onPick(r)}>{formatRef(books, r)}</button>
+        {/each}
+      </div>
+    {/if}
 
     <h3>{t(lang, 'oldTestament')}</h3>
     <div class="grid books">
@@ -120,4 +130,6 @@
   }
   .cell.num { padding: 12px 0; font-weight: 600; }
   .cell.active { background: var(--accent); color: var(--accent-fg); }
+  .recent { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-bottom: 4px; }
+  .rc { flex: none; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-elev); font-size: 14px; font-weight: 600; white-space: nowrap; }
 </style>

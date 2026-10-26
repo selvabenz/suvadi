@@ -4,6 +4,8 @@
   import { formatRef, parseTypedRef } from '../refs';
   import type { BookIndex } from '../booknames';
   import { t } from '../i18n';
+  import { app } from '../state.svelte';
+  import Icon from './Icon.svelte';
 
   let {
     books,
@@ -26,6 +28,7 @@
   async function run(e?: Event) {
     e?.preventDefault();
     if (tooShort) return;
+    app.pushSearch(query);
     if (signal) signal.cancelled = true;
     const s = { cancelled: false, skipped: 0 };
     signal = s;
@@ -45,6 +48,17 @@
       if (!s.cancelled) busy = false;
     }
   }
+
+  // emptying the box brings the history back
+  $effect(() => {
+    if (!query.trim()) hits = null;
+  });
+
+  function again(q: string) {
+    query = q;
+    run();
+  }
+  const recentRefs = $derived(app.history.filter((r) => books.some((b) => b.code === r.book)).slice(0, 12));
 
   function snippet(text: string): { before: string; match: string; after: string } {
     const flat = text.replace(/\n/g, ' ');
@@ -74,6 +88,35 @@
     <p class="muted small">{t(lang, 'searchHint')}</p>
   {/if}
 
+  {#if !query.trim() && !hits && !busy}
+    {#if recentRefs.length}
+      <section class="hist">
+        <header class="label"><Icon name="book" size={15} /><span class="lt">{t(lang, 'recentRefs')}</span>
+          <button class="clr" onclick={() => app.clearHistory()}>{t(lang, 'clearAll')}</button></header>
+        <div class="chips">
+          {#each recentRefs as r (r.book + r.ch + ':' + r.v)}
+            <button class="hchip" onclick={() => onNavigate(r)}>{formatRef(books, r)}</button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+    {#if app.searches.length}
+      <section class="hist">
+        <header class="label"><Icon name="search" size={15} /><span class="lt">{t(lang, 'recentSearches')}</span>
+          <button class="clr" onclick={() => app.clearSearches()}>{t(lang, 'clearAll')}</button></header>
+        <div class="card rows">
+          {#each app.searches.slice(0, 10) as q (q)}
+            <button class="row qrow" onclick={() => again(q)}>
+              <span class="lead"><Icon name="search" size={18} /></span>
+              <span class="rl"><span>{q}</span></span>
+              <span class="trail"><Icon name="chevron-right" size={16} /></span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+  {/if}
+
   {#if busy}
     <p class="muted">{t(lang, 'searching')} {progress}/{books.length}</p>
   {/if}
@@ -100,6 +143,14 @@
 </div>
 
 <style>
+  .hist { margin: 18px 0 8px; }
+  .hist > .label { margin: 0 2px 8px; }
+  .lt { flex: 1; }
+  .clr { font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--fg-muted); padding: 4px 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hchip { padding: 7px 14px; border-radius: var(--r-pill); background: var(--bg-elev); border: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+  .hchip:active { background: var(--accent-soft); }
+  .card.rows .qrow { display: grid; padding: 10px 16px; min-height: 48px; }
   .bar { display: flex; gap: 8px; margin-bottom: 12px; }
   .bar input { flex: 1; }
   .goto { margin-bottom: 12px; }

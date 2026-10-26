@@ -1,7 +1,7 @@
 {
   "name": "suvadi",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "Suvadi (சுவடி): the Bible in Indian languages, one verse at a time. An offline-first scrolling Bible reader (PWA).",
   "license": "GPL-3.0-only",

@@ -14,6 +14,7 @@
   import StudyPage from './lib/components/StudyPage.svelte';
   import TvMode from './lib/components/TvMode.svelte';
   import TvSheet from './lib/components/TvSheet.svelte';
+  import TranslationSheet from './lib/components/TranslationSheet.svelte';
   import { appBase, parseAppUrl, receiverUrl, tvUrl } from './lib/url';
   import { isReceiver, presentAvailable, presentSupported, sendRef, startPresenting, stopPresenting, type PresentConn, type TvMessage } from './lib/present';
   import { copyText } from './lib/clipboard';
@@ -45,6 +46,7 @@
   let bookIndex = $state<BookIndex | null>(null);
   // TV
   let tvSheet = $state(false);
+  let trSheet = $state(false);
   let canPresent = $state(false);
   let presentConn = $state<PresentConn | null>(null);
   let tvReceiver = $state(false);
@@ -181,22 +183,23 @@
 
   // Desktop: the arrow keys change chapter like a swipe.
   function onKey(e: KeyboardEvent) {
-    if (view !== 'read' || picker || study || tvSheet) return;
+    if (view !== 'read' || picker || study || tvSheet || trSheet) return;
     if ((e.target as HTMLElement).closest('input, textarea')) return;
     if (e.key === 'ArrowRight') step(1);
     else if (e.key === 'ArrowLeft') step(-1);
   }
 
-  /** The top-left pill: switch between the available translations in one tap. */
-  function nextTranslation() {
-    const usable = translations.filter((x) => x.id !== ESV_ID || esvKey());
-    if (usable.length < 2) {
-      view = 'settings';
-      return;
-    }
-    const i = usable.findIndex((x) => x.id === translation);
-    app.update('translation', usable[(i + 1) % usable.length].id);
+  /** The Bible menu (top-left pill). */
+  function pickTranslation(id: string) {
+    trSheet = false;
+    if (id !== translation) app.update('translation', id);
   }
+  /** The pill's label: the abbreviation, or the full name when several share it (four "IRV"s). */
+  const pillLabel = $derived.by(() => {
+    if (!manifest) return '';
+    const same = translations.filter((x) => x.abbr === manifest!.abbr).length > 1;
+    return same ? manifest.name : manifest.abbr;
+  });
 
   const chapterLabel = $derived(books.find((b) => b.code === current.book)?.name ?? '');
 
@@ -405,7 +408,7 @@
       <header class="top">
         <div class="pills">
           <button class="pill nav" onclick={() => step(-1)} aria-label={t(lang, 'prevChapter')} title={t(lang, 'prevChapter')}><Icon name="chevron-left" size={18} /></button>
-          <button class="pill tr" onclick={nextTranslation} aria-label={t(lang, 'translation')} title={t(lang, 'translation')}>{manifest.abbr}</button>
+          <button class="pill tr" onclick={() => (trSheet = true)} aria-haspopup="dialog" aria-label={t(lang, 'translation')} title={t(lang, 'translation')} lang={manifest.lang}>{pillLabel}<Icon name="chevron-down" size={14} /></button>
         </div>
         <div class="pills">
           <button class="pill title" onclick={() => (picker = true)} aria-label={currentLabel}>
@@ -435,6 +438,17 @@
       </nav>
     {/if}
 
+    {#if trSheet}
+      <TranslationSheet
+        {lang}
+        {translations}
+        value={translation}
+        usable={(id) => id !== ESV_ID || !!esvKey()}
+        onPick={pickTranslation}
+        onSettings={() => { trSheet = false; view = 'settings'; }}
+        onClose={() => (trSheet = false)}
+      />
+    {/if}
     {#if tvSheet}
       <TvSheet
         {lang}
