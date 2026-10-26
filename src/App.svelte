@@ -11,7 +11,7 @@
   import { app } from './lib/state.svelte';
   import Feed from './lib/components/Feed.svelte';
   import Picker from './lib/components/Picker.svelte';
-  import StudySheet from './lib/components/StudySheet.svelte';
+  import StudyPage from './lib/components/StudyPage.svelte';
   import PlanView from './lib/components/PlanView.svelte';
   import SavedView from './lib/components/SavedView.svelte';
   import SearchView from './lib/components/SearchView.svelte';
@@ -308,19 +308,21 @@
       <SettingsView {lang} {offlineReady} {translations} {manifest} />
     {/if}
 
-    <nav class="bottom" aria-label="main">
-      {#each NAV as n (n.view)}
-        <button class:on={view === n.view} onclick={() => (view = n.view)} aria-label={t(lang, n.label)} title={t(lang, n.label)} aria-current={view === n.view ? 'page' : undefined}>
-          <Icon name={n.icon} size={24} stroke={view === n.view ? 2.1 : 1.6} />
-        </button>
-      {/each}
-    </nav>
+    {#if !study}
+      <nav class="bottom" aria-label="main">
+        {#each NAV as n (n.view)}
+          <button class:on={view === n.view} onclick={() => (view = n.view)} aria-label={t(lang, n.label)} title={t(lang, n.label)} aria-current={view === n.view ? 'page' : undefined}>
+            <Icon name={n.icon} size={24} stroke={view === n.view ? 2 : 1.6} />
+          </button>
+        {/each}
+      </nav>
+    {/if}
 
     {#if picker}
       <Picker {books} {current} {lang} index={bookIndex} onPick={(r) => { picker = false; navigate(r); }} onClose={() => (picker = false)} />
     {/if}
     {#if study}
-      <StudySheet
+      <StudyPage
         r={study.r}
         verse={study.v}
         {books}
@@ -337,6 +339,7 @@
         onAsk={(m, sel) => (study ? askAi(m, study.r, study.v, sel) : Promise.reject(new Error('')))}
         onNavigate={(r) => { study = null; navigate(r); }}
         onClose={() => (study = null)}
+        onToast={showToast}
       />
     {/if}
   {/if}
@@ -360,16 +363,6 @@
     pointer-events: none;
   }
   .pills { display: flex; gap: 8px; pointer-events: auto; }
-  .pill {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    height: 38px; min-width: 38px; padding: 0 14px;
-    border-radius: 999px;
-    background: var(--bg-elev);
-    color: var(--fg);
-    box-shadow: var(--pill-shadow);
-    font-size: 15px;
-  }
-  .pill.nav { padding: 0; color: var(--fg-muted); }
   .pill.tr { font-weight: 700; letter-spacing: 0.02em; }
   .pill.title { max-width: 52vw; }
   .pill.title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

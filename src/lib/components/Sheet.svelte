@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import Icon from './Icon.svelte';
 
   let {
     title = '',
@@ -20,7 +21,7 @@
   <div class="grip" aria-hidden="true"></div>
   <header>
     <h2>{title}</h2>
-    <button class="close" onclick={onClose} aria-label="close">✕</button>
+    <button class="iconbtn" onclick={onClose} aria-label="close"><Icon name="close" size={20} /></button>
   </header>
   <div class="body">
     {@render children()}
@@ -38,7 +39,7 @@
     left: 0; right: 0; bottom: 0;
     max-height: 72dvh;
     background: var(--bg-elev);
-    border-radius: 20px 20px 0 0;
+    border-radius: 22px 22px 0 0;
     box-shadow: var(--shadow);
     z-index: 41;
     display: flex;
@@ -58,7 +59,6 @@
     padding: 8px 16px 4px;
   }
   header h2 { font-size: 17px; margin: 0; }
-  .close { font-size: 18px; padding: 8px; color: var(--fg-muted); }
   .body {
     overflow-y: auto;
     padding: 4px 16px 20px;

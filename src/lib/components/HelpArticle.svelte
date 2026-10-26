@@ -35,7 +35,7 @@
   });
 </script>
 
-<article class="art">
+<article class="art card">
   {#if failed}
     {#if kind === 'ta'}
       <p class="muted small">{t(lang, 'studyOffline')}</p>
@@ -70,5 +70,6 @@
   .sub { margin: -6px 0 10px; }
   .see { margin: 6px 0 10px; }
   .chip.link { color: var(--accent); font-weight: 600; }
-  .attr { margin-top: 14px; }
+  .attr { margin-top: 14px; font-size: 12px; }
+  .art { margin-bottom: 16px; }
 </style>

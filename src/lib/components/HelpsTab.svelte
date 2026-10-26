@@ -4,6 +4,7 @@
   import { overlaps, versesOf } from '../study';
   import { t } from '../i18n';
   import Md from './Md.svelte';
+  import SectionCard from './SectionCard.svelte';
 
   // unfoldingWord Translation Notes and Translation Words for the verse. In the
   // ULT the notes also show the English words they are about (from the
@@ -18,6 +19,7 @@
     twIndex,
     taIndex,
     onOpen,
+    onToast,
   }: {
     r: Ref;
     verse: Verse;
@@ -29,6 +31,7 @@
     twIndex: TwIndex | null;
     taIndex: TaIndex | null;
     onOpen: (kind: 'tw' | 'ta', id: string) => void;
+    onToast?: (msg: string) => void;
   } = $props();
 
   type Item = TnNote & { title?: boolean };
@@ -82,6 +85,11 @@
     }
     return out.sort((a, b) => Number(b.hit) - Number(a.hit));
   });
+  // copy: notes as plain text (Markdown marks removed)
+  const plain = (md: string) => md.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#]/g, '').trim();
+  const notesText = $derived(
+    ordered ? [...ordered.first, ...ordered.rest].map((n) => (english(n) ? `${english(n)}: ` : '') + plain(n.note)).join('\n\n') : '',
+  );
 </script>
 
 {#snippet note(n: Item)}
@@ -104,18 +112,16 @@
   <p class="muted small">{t(lang, 'loading')}</p>
 {:else}
   {#if terms.length}
-    <section>
-      <h3>{t(lang, 'twTitle')}</h3>
+    <SectionCard icon="bulb" label={t(lang, 'twTitle')} tint="a" {lang}>
       <div class="terms">
         {#each terms as term (term.slug)}
-          <button class="chip term {term.cat}" class:hit={term.hit} onclick={() => onOpen('tw', term.slug)}>{term.title}</button>
+          <button class="term {term.cat}" class:hit={term.hit} onclick={() => onOpen('tw', term.slug)}>{term.title}</button>
         {/each}
       </div>
-    </section>
+    </SectionCard>
   {/if}
 
-  <section>
-    <h3>{t(lang, 'tnTitle')}</h3>
+  <SectionCard icon="note" label={t(lang, 'tnTitle')} copyText={notesText || undefined} {lang} {onToast} flush={!!(ordered.first.length || ordered.rest.length)}>
     {#if !ordered.first.length && !ordered.rest.length}
       <p class="muted small">—</p>
     {:else}
@@ -133,24 +139,24 @@
         {/if}
       {/if}
     {/if}
-  </section>
-  <p class="muted small" lang="en">{t(lang, 'attrUw')}</p>
+  </SectionCard>
+  <p class="muted note-attr" lang="en">{t(lang, 'attrUw')}</p>
 {/if}
 
 <style>
-  section { margin: 6px 0 18px; }
-  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); margin: 0 0 8px; }
-  .terms { display: flex; flex-wrap: wrap; gap: 4px; }
-  .chip.term { color: var(--accent); font-weight: 600; }
-  .chip.term.names { font-style: italic; }
-  .chip.term.hit { background: var(--mark); color: var(--fg); }
+  p.small { margin: 0; }
+  .terms { display: flex; flex-wrap: wrap; gap: 6px; }
+  .term { padding: 5px 12px; border-radius: var(--r-pill); background: var(--bg-elev); color: var(--fg); font-size: 14px; font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+  .term.names { font-style: italic; font-weight: 500; }
+  .term.hit { background: var(--mark); box-shadow: none; }
   .notes { list-style: none; margin: 0; padding: 0; }
-  .note { border-bottom: 1px solid var(--line); padding: 10px 0 8px; }
-  .note.hit { border-left: 3px solid var(--accent); padding-left: 10px; }
-  .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-bottom: 6px; }
-  .en { font-weight: 700; background: var(--mark); border-radius: 4px; padding: 0 4px; }
+  .note { padding: 14px 16px 12px; }
+  .note + .note { border-top: 1px solid var(--line); }
+  .note.hit { box-shadow: inset 3px 0 0 var(--accent); }
+  .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin-bottom: 8px; }
+  .en { font-weight: 700; background: var(--mark); border-radius: 4px; padding: 0 5px; }
   .q { font-size: 17px; color: var(--fg-muted); unicode-bidi: isolate; }
-  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--fg-muted); }
-  .tag.link { color: var(--accent); font-weight: 600; }
-  .more { color: var(--accent); font-weight: 600; padding: 10px 0; font-size: 14px; }
+  .tag.link { color: var(--fg); font-weight: 600; background: var(--accent-soft); padding: 3px 10px; font-size: 12px; }
+  .more { display: block; width: 100%; text-align: left; color: var(--fg); font-weight: 600; padding: 12px 16px; font-size: 14px; border-top: 1px solid var(--line); }
+  .note-attr { font-size: 12px; margin: -8px 4px 16px; }
 </style>

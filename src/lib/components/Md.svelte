@@ -56,7 +56,7 @@
   .md .h1 { font-size: calc(17px * var(--font-scale)); }
   .md .li { padding-left: 16px; position: relative; }
   .md .li::before { content: '•'; position: absolute; left: 4px; color: var(--fg-muted); }
-  .md .alt { background: var(--accent-soft); border-radius: 10px; padding: 8px 10px; }
-  .md .altl { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); margin-bottom: 2px; }
+  .md .alt { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; }
+  .md .altl { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); margin-bottom: 3px; }
   .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; padding: 0; font: inherit; }
 </style>

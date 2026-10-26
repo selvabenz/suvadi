@@ -6,11 +6,12 @@
 
 <script lang="ts">
   import type { AlignChapter, AlignVerse, BookMeta, Lang, Manifest, Ref, Selection, StepWord, TaIndex, TwIndex, Verse } from '../types';
-  import { hasAlignment as aligned, loadAlign, loadStrongToTw, loadTaIndex, loadTwIndex, loadWords } from '../data';
+  import { hasAlignment as aligned, loadAlign, loadTaIndex, loadTwIndex, loadTwl, loadWords } from '../data';
   import { formatRef } from '../refs';
   import { overlaps, strongBase, versesOf } from '../study';
   import { t } from '../i18n';
-  import Sheet from './Sheet.svelte';
+  import { fitWords } from '../fit';
+  import { copyText } from '../clipboard';
   import Tabs, { type Tab } from './Tabs.svelte';
   import NotesTab from './NotesTab.svelte';
   import FootnotesTab from './FootnotesTab.svelte';
@@ -38,6 +39,7 @@
     onAsk,
     onNavigate,
     onClose,
+    onToast,
   }: {
     r: Ref;
     verse: Verse;
@@ -56,6 +58,7 @@
     onAsk: (message: string, sel: Selection | null) => Promise<string>;
     onNavigate: (r: Ref) => void;
     onClose: () => void;
+    onToast?: (msg: string) => void;
   } = $props();
 
   type TabId = Exclude<StudySection, 'explain'>;
@@ -96,12 +99,34 @@
   // Indexes for article titles and Strong's -> Translation Words, loaded once when needed.
   let twIndex = $state<TwIndex | null>(null);
   let taIndex = $state<TaIndex | null>(null);
+  // Strong's -> Translation Words articles for THIS verse, from its Words links
+  // (exact per word; a Strong's number alone would match many articles).
   let strongToTw = $state<Map<string, string[]> | null>(null);
+  $effect(() => {
+    const ref = r;
+    const vs = versesOf(verse).map(String);
+    strongToTw = null;
+    if (!notesOn) return;
+    loadTwl(ref.book, ref.ch)
+      .then((rows) => {
+        const m = new Map<string, string[]>();
+        for (const k of vs) {
+          for (const [, , slug, , strong] of rows[k] ?? []) {
+            const b = strongBase(strong);
+            if (!b) continue;
+            const list = m.get(b) ?? [];
+            if (!list.includes(slug)) list.push(slug);
+            m.set(b, list);
+          }
+        }
+        strongToTw = m;
+      })
+      .catch(() => {});
+  });
   $effect(() => {
     if (!notesOn || (active !== 'helps' && active !== 'words' && !explaining && !article)) return;
     if (!twIndex) loadTwIndex().then((x) => (twIndex = x)).catch(() => {});
     if (!taIndex) loadTaIndex().then((x) => (taIndex = x)).catch(() => {});
-    if (!strongToTw) loadStrongToTw().then((x) => (strongToTw = x)).catch(() => {});
   });
   const twTitle = (slug: string) => twIndex?.[slug]?.[0] ?? slug;
 
@@ -151,6 +176,21 @@
 
   // Set only once the Notes tab has been shown, so closing from another tab never touches the note.
   let draft = $state<string | undefined>(undefined);
+  // The verse as quoted at the top of the page; the circled words are marked.
+  const quoteParts = $derived.by(() => {
+    const text = verse.text;
+    if (!explaining || !focus || focus.end <= focus.start) return [{ s: text, mark: false }];
+    return [
+      { s: text.slice(0, focus.start), mark: false },
+      { s: text.slice(focus.start, focus.end), mark: true },
+      { s: text.slice(focus.end), mark: false },
+    ].filter((x) => x.s);
+  });
+  async function copyVerse() {
+    const ok = await copyText(`${verse.text}\n— ${title} (${manifest.abbr})`);
+    onToast?.(t(lang, ok ? 'copied' : 'copyFailed'));
+  }
+
   function close() {
     // Escape and the backdrop close the sheet: keep what was typed.
     if (draft !== undefined && draft.trim() !== note.trim()) onSaveNote(draft);
@@ -176,7 +216,26 @@
   {/if}
 {/snippet}
 
-<Sheet title={explaining ? `${t(lang, 'explain')} · ${title}` : title} onClose={close} tall>
+<svelte:window onkeydown={(e) => e.key === 'Escape' && !article && close()} />
+
+<div class="page" role="dialog" aria-modal="true" aria-label={`${explaining ? t(lang, 'explain') : t(lang, 'study')} · ${title}`}>
+  <header class="phead">
+    <button class="pill back" onclick={close} aria-label={t(lang, 'back')}>
+      <Icon name="chevron-left" size={18} /><span>{t(lang, 'back')}</span>
+    </button>
+    <div class="ptitle">
+      <span class="pt"><Icon name={explaining ? 'sparkle' : 'bulb'} size={18} /> {explaining ? t(lang, 'explain') : t(lang, 'study')}</span>
+      <h1>{title}</h1>
+    </div>
+  </header>
+
+  <blockquote class="quote card tint-a" lang={manifest.lang}>
+    <div class="qtext" use:fitWords>{#each quoteParts as part}{#if part.mark}<mark>{part.s}</mark>{:else}{part.s}{/if}{/each}</div>
+    <footer>
+      <span class="abbr">{manifest.abbr}</span>
+      <button class="iconbtn" onclick={copyVerse} aria-label={t(lang, 'copy')} title={t(lang, 'copy')}><Icon name="copy" size={17} /></button>
+    </footer>
+  </blockquote>
 
   {#if explaining && !article}
     <ExplainPanel
@@ -194,24 +253,58 @@
 
   <div role="tabpanel">
     {#if article}
-      <button class="back" onclick={() => (article = null)}><Icon name="chevron-left" size={16} /> {t(lang, 'back')}</button>
+      <button class="pill artback" onclick={() => (article = null)}><Icon name="chevron-left" size={16} /> {t(lang, 'back')}</button>
       <HelpArticle kind={article.kind} id={article.id} {lang} {twTitle} onOpen={openArticle} />
     {:else if active === 'notes'}
       <NotesTab initial={note} {lang} autofocus={section === 'notes'} onSave={onSaveNote} {onShare} {onWhatsApp} bind:draft />
     {:else if active === 'footnotes'}
-      <FootnotesTab {verse} {lang} textLang={manifest.lang} />
+      <FootnotesTab {verse} {lang} textLang={manifest.lang} {onToast} />
     {:else if active === 'xrefs'}
-      <XrefsTab {r} {verse} {books} {lang} {translation} enabled={xrefsOn} {onNavigate} />
+      <XrefsTab {r} {verse} {books} {lang} {translation} enabled={xrefsOn} {onNavigate} {onToast} />
     {:else if active === 'words'}
-      <WordsTab {words} failed={wordsFailed} {isOT} {lang} twByStrong={notesOn ? strongToTw : null} {twTitle} onOpenTw={(slug) => openArticle('tw', slug)} />
+      <WordsTab {words} failed={wordsFailed} {isOT} {lang} twByStrong={notesOn ? strongToTw : null} {twTitle} onOpenTw={(slug) => openArticle('tw', slug)} {onToast} />
     {:else if active === 'helps'}
-      <HelpsTab {r} {verse} {lang} {isOT} aligned={hasAlignment} focus={explaining ? focus : null} {twIndex} {taIndex} onOpen={openArticle} />
+      <HelpsTab {r} {verse} {lang} {isOT} aligned={hasAlignment} focus={explaining ? focus : null} {twIndex} {taIndex} onOpen={openArticle} {onToast} />
     {/if}
   </div>
-</Sheet>
+</div>
 
 <style>
-  .back { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; padding: 4px 0 10px; }
+  .page {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: calc(var(--safe-top) + 10px) 16px calc(var(--safe-bottom) + 32px);
+    animation: slide 0.2s ease-out;
+  }
+  @keyframes slide { from { transform: translateX(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+  .phead { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; margin-bottom: 14px; }
+  .back { justify-self: start; padding: 0 14px 0 8px; gap: 2px; font-size: 15px; }
+  .ptitle { grid-column: 2; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 2px; }
+  .pt { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--fg-muted); }
+  .ptitle h1 { font-size: 19px; font-weight: 700; margin: 2px 0 0; }
+  .quote {
+    margin: 0 0 16px;
+    padding: 18px 18px 8px;
+    text-align: center;
+  }
+  .qtext {
+    font-size: calc(18px * var(--font-scale) * var(--fit, 1));
+    line-height: var(--line-height, 1.5);
+    white-space: pre-line;
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+  .quote:lang(en) .qtext { font-style: italic; }
+  .quote mark { background: var(--mark); color: var(--fg); border-radius: 4px; padding: 0 3px; }
+  .quote footer { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--fg-muted); }
+  .abbr { font-weight: 700; letter-spacing: 0.04em; }
+  .artback { margin-bottom: 12px; padding: 0 14px 0 8px; height: 34px; font-size: 14px; }
+  @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
   .orig { list-style: none; margin: 0 0 10px; padding: 0; }
   .orig li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
   .o { font-size: 20px; unicode-bidi: isolate; }

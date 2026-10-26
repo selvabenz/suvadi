@@ -191,6 +191,7 @@ const STRINGS = {
   shareWithNote: { ta: 'குறிப்புடன் பகிர்', en: 'Share with note' },
   gestureAi: { ta: '✦ ஐத் தொட்டு, சொற்களைத் தேர்ந்தெடுத்து விளக்கம் பெறுங்கள்', en: 'Tap ✦, then tap words, to explain a word or phrase' },
   draft: { ta: 'வரைவு', en: 'Draft' },
+  copyFailed: { ta: 'நகலெடுக்க முடியவில்லை', en: 'Could not copy' },
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

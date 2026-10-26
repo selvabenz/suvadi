@@ -47,15 +47,15 @@
 <style>
   .tabs {
     position: sticky;
-    top: -4px;
+    top: calc(-1 * (var(--safe-top) + 10px));
     z-index: 2;
     display: flex;
-    gap: 6px;
+    gap: 8px;
     overflow-x: auto;
     scrollbar-width: none;
-    background: var(--bg-elev);
-    padding: 4px 0 10px;
-    margin-bottom: 6px;
+    background: var(--bg);
+    margin: 0 -16px 10px;
+    padding: 8px 16px 10px;
   }
   .tabs::-webkit-scrollbar { display: none; }
   button {
@@ -63,14 +63,16 @@
     align-items: center;
     gap: 6px;
     flex: none;
-    padding: 7px 12px;
-    border-radius: 999px;
-    font-size: 13px;
-    color: var(--fg-muted);
+    height: 36px;
+    padding: 0 14px;
+    border-radius: var(--r-pill);
+    font-size: 14px;
+    color: var(--fg);
     white-space: nowrap;
-    background: transparent;
+    background: var(--bg-elev);
     border: 1px solid var(--line);
   }
-  button.on { background: var(--accent-soft); color: var(--fg); border-color: transparent; font-weight: 600; }
+  button.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
+  button.on .count { color: inherit; opacity: 0.75; }
   .count { font-size: 11px; color: var(--fg-muted); }
 </style>
