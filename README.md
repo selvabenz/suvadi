@@ -192,8 +192,16 @@ be **GitHub Actions** (once). A root domain needs a build with no `BASE_PATH`.
   native review.
 - Search is a plain substring match; it does not normalise sandhi or spelling
   variants.
-- Not tested on a physical phone yet. Checked in a desktop browser at phone
-  width and with headless screenshots.
+- Used on an Android phone; not yet tried on an iPhone (where there is no
+  element fullscreen for TV mode).
+- "Present on TV" (desktop Chrome/Edge to a Chromecast or display) is tested
+  against a simulated Presentation API only; treat it as experimental.
+- Seven ULT books (NUM 1CH 2CH ECC ISA JER EZK) are unfoldingWord drafts and
+  are marked "Draft"; refresh them after the next unfoldingWord release.
+- Placing a Translation Note on the ULT's English words ignores word order, so
+  a repeated small word can be highlighted at the wrong place in a long verse.
+- The Translation Notes book and chapter introductions are built
+  (`tn/<BOOK>/intro.json`) but not shown yet.
 - Play Store / App Store packaging (a Trusted Web Activity wrapping the PWA) is
   the next release step after GitHub Pages.
 

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Book, Manifest, Ref, Selection, StudySection, TranslationInfo, Verse } from './lib/types';
-  import { DEFAULT_TRANSLATION, getVerse, loadBook, loadBookIndex, loadManifest, loadTranslations } from './lib/data';
+  import { DEFAULT_TRANSLATION, getVerse, loadBook, loadBookIndex, loadManifest, loadNotes, loadTranslations, loadWords } from './lib/data';
+  import { versesOf } from './lib/study';
   import type { BookIndex } from './lib/booknames';
   import { formatRef, nextChapter, prevChapter, refKey } from './lib/refs';
   import { ask, AiError } from './lib/ai';
@@ -342,12 +343,27 @@
   }
 
   /** Explain: send the question and what the sheet knows to the reader's AI service. */
+  /** The verse's Translation Notes and original words, as plain text for the AI service. */
+  async function aiContext(r: Ref, v: Verse): Promise<{ notes: string[]; words: string[] }> {
+    const keys = versesOf(v).map(String);
+    const [n, w] = await Promise.all([
+      loadNotes(r.book, r.ch).catch(() => ({}) as Awaited<ReturnType<typeof loadNotes>>),
+      loadWords(r.book, r.ch).catch(() => ({}) as Awaited<ReturnType<typeof loadWords>>),
+    ]);
+    const plain = (md: string) => md.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#]/g, '').trim();
+    return {
+      notes: keys.flatMap((k) => n[k] ?? []).slice(0, 12).map((x) => plain(x.note)),
+      words: keys.flatMap((k) => w[k] ?? []).map(([surface, , gloss, strong]) => `${surface} (${strong}): ${gloss}`),
+    };
+  }
+
   async function askAi(message: string, r: Ref, v: Verse, sel: Selection | null): Promise<string> {
     try {
+      const ctx = await aiContext(r, v);
       return await ask(app.settings.aiEndpoint, app.settings.aiKey, {
         message,
         verse: { ref: formatRef(books, { book: r.book, ch: r.ch, v: v.n }, v.end), text: v.text, translation: manifest?.abbr ?? '' },
-        context: { selection: sel?.text },
+        context: { selection: sel?.text, ...ctx },
       });
     } catch (e) {
       const kind = e instanceof AiError ? e.kind : 'network';

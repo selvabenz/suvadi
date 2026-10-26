@@ -216,7 +216,7 @@
   {/if}
 {/snippet}
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && !article && close()} />
+<svelte:window onkeydown={(e) => { if (e.key !== 'Escape') return; if (article) article = null; else close(); }} />
 
 <div class="page" role="dialog" aria-modal="true" aria-label={`${explaining ? t(lang, 'explain') : t(lang, 'study')} · ${title}`}>
   <header class="phead">

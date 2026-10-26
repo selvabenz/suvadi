@@ -57,4 +57,43 @@ test.describe('study page', () => {
     await expect(page.locator('.page .orig li').first()).toContainText('πίστιν');
     await expect(page.locator('.page .note.hit').first()).toBeVisible();
   });
+
+  test('Escape goes back from a Words article, then closes the page', async ({ page }) => {
+    await openWith(page, { settings: { lang: 'en' }, place: { book: 'TIT', ch: 1, v: 1 } });
+    const c = card(page, '1:1');
+    await c.locator('.rail button[aria-expanded]').click();
+    await c.locator('.menu button').first().click();
+    const study = page.locator('.page[role=dialog]');
+    await study.locator('[role=tab]', { hasText: 'Helps' }).click();
+    await study.locator('.term').first().click();
+    await expect(study.locator('.art h3')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(study.locator('.art')).toHaveCount(0);
+    await expect(study).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(study).toHaveCount(0);
+  });
+
+  test('a question to the AI service carries the verse, its notes and its words', async ({ page }) => {
+    await page.route('https://ai.example.test/ask', async (route) => {
+      const body = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify({ reply: `notes:${body.context.notes.length} words:${body.context.words.length} ref:${body.verse.ref}` }),
+      });
+    });
+    await openWith(page, { settings: { lang: 'en', translation: 'en-ult', aiEndpoint: 'https://ai.example.test/ask' }, place: { book: 'TIT', ch: 1, v: 1 } });
+    const c = card(page, '1:1');
+    await c.locator('.rail .ai').click();
+    await page.locator('.selbar .btn.primary').click();
+    await page.locator('.page .ask input').fill('What is faith here?');
+    await page.locator('.page .ask button[type=submit]').click();
+    const reply = page.locator('.page .ask .reply');
+    await expect(reply).toContainText('ref:Titus 1:1');
+    const [, notes, words] = /notes:(\d+) words:(\d+)/.exec(await reply.innerText())!;
+    expect(Number(notes)).toBeGreaterThan(0);
+    expect(Number(words)).toBeGreaterThan(0);
+  });
 });
