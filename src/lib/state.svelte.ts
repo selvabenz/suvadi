@@ -18,12 +18,14 @@ export interface Settings {
   theme: Theme;
   fontScale: number;   // 0.8 .. 1.6
   redLetters: boolean;
-  showNumbers: boolean;   // the verse number inside the text
   showRef: boolean;       // "1:1" after the book name above the verse
   showHeadings: boolean;  // section headings and parallel-passage lines
   textAlign: TextAlign;
   font: FontId;
   esvKey: string;         // the reader's own ESV API key, kept on this device only
+  lineHeight: number;     // line spacing of the verse text, 1.3 .. 2.0
+  aiEndpoint: string;     // optional AI service for Explain (a future BT Servant proxy)
+  aiKey: string;
 }
 
 export interface Bookmark { at: string }
@@ -43,7 +45,7 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true, showRef: true, showHeadings: true, textAlign: 'center', font: 'meera', esvKey: '' },
+  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showRef: true, showHeadings: false, textAlign: 'center', font: 'meera', esvKey: '', lineHeight: 1.45, aiEndpoint: '', aiKey: '' },
   place: { book: 'JHN', ch: 1, v: 1 },
   bookmarks: {},
   likes: {},

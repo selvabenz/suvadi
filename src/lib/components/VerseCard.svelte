@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Lang, Verse } from '../types';
-  import { layoutVerse } from '../layout';
+  import type { Lang, Selection, StudySection, Verse } from '../types';
+  import { layoutVerse, selectionText, splitWords } from '../layout';
   import { tap } from '../gestures';
   import { t } from '../i18n';
   import Icon from './Icon.svelte';
@@ -20,6 +20,7 @@
     onLike,
     onNote,
     onShare,
+    onExplain,
   }: {
     verse: Verse;
     label: string;
@@ -30,11 +31,13 @@
     bookmarked: boolean;
     liked: boolean;
     hasNote: boolean;
-    onStudy: (section?: 'footnotes' | 'xrefs') => void;
+    onStudy: (section?: StudySection) => void;
     onBookmark: () => void;
     onLike: () => void;
     onNote: () => void;
     onShare: () => void;
+    /** Open the explain sheet for the circled words, or the whole verse. */
+    onExplain: (sel: Selection | null) => void;
   } = $props();
 
   const lines = $derived(layoutVerse(verse));
@@ -50,10 +53,53 @@
     onLike();
   }
   function longPress() {
+    if (selecting) return;
     open = true;
     if (navigator.vibrate) navigator.vibrate(12);
   }
+
+  // Explain mode: ✦ turns the verse into tappable words; tapping words circles
+  // a phrase, and the pill (or ✦ again) opens the explanation.
+  let selecting = $state(false);
+  let sel = $state<{ a: number; b: number } | null>(null);
+  const wordLines = $derived(splitWords(lines));
+  const selection = $derived(sel ? selectionText(verse.text, wordLines, sel.a, sel.b) : null);
+
+  function toggleWord(w: number) {
+    if (!sel) sel = { a: w, b: w };
+    else if (w === sel.a - 1) sel = { a: w, b: sel.b };
+    else if (w === sel.b + 1) sel = { a: sel.a, b: w };
+    else if (w === sel.a && w === sel.b) sel = null;
+    else if (w === sel.a) sel = { a: w + 1, b: sel.b };
+    else if (w === sel.b) sel = { a: sel.a, b: w - 1 };
+    else sel = { a: w, b: w };
+  }
+  function exitSelect() {
+    selecting = false;
+    sel = null;
+  }
+  function sparkle() {
+    if (!selecting) {
+      open = false;
+      selecting = true;
+      return;
+    }
+    explain();
+  }
+  function explain() {
+    const s = selection;
+    exitSelect();
+    onExplain(s);
+  }
+  function clip(s: string, n = 28): string {
+    return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
+  }
+  function onKey(e: KeyboardEvent) {
+    if (selecting && e.key === 'Escape') exitSelect();
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="scroll" use:tap={{ onDoubleTap: like, onLongPress: longPress }}>
   <div class="body">
@@ -68,7 +114,25 @@
       <p class="lead muted" lang={textLang}>{verse.lead}</p>
     {/if}
 
-    <div class="text" class:red={redLetters} lang={textLang}>
+    <div class="text" class:red={redLetters} class:selecting lang={textLang}>
+      {#if selecting}
+        {#each wordLines as line, li}
+          <span class="line {line.style}" class:first={li === 0}>
+            {#each line.items as it}
+              {#if it.t === 'word'}
+                <button
+                  class="w"
+                  class:wj={it.wj}
+                  class:sel={!!sel && it.w >= sel.a && it.w <= sel.b}
+                  onclick={() => toggleWord(it.w)}
+                >{it.s}</button>
+              {:else if it.t === 'space'}{it.s}
+              {:else if it.t === 'fn'}<span class="marker">{String.fromCharCode(97 + (it.i % 26))}</span>
+              {:else}<span class="marker">✱</span>{/if}
+            {/each}
+          </span>
+        {/each}
+      {:else}
       {#each lines as line, li}
         <span class="line {line.style}" class:first={li === 0}>
           {#each line.parts as part}
@@ -82,6 +146,7 @@
           {/each}
         </span>
       {/each}
+      {/if}
     </div>
 
     <p class="ref">{label}</p>
@@ -101,6 +166,9 @@
       <button onclick={onShare} aria-label={t(lang, 'share')} title={t(lang, 'share')}><Icon name="send" /></button>
     </div>
   {/if}
+  <button class="ai" class:on={selecting} onclick={sparkle} aria-pressed={selecting} aria-label={t(lang, 'explain')} title={t(lang, 'explain')}>
+    <Icon name="sparkle" />
+  </button>
   <button class="like" class:liked onclick={like} aria-pressed={liked} aria-label={t(lang, 'like')} title={t(lang, 'like')}>
     <Icon name="heart" filled={liked} />
   </button>
@@ -108,6 +176,17 @@
     <Icon name={open ? 'close' : 'more'} />
   </button>
 </div>
+
+{#if selecting}
+  <div class="selbar" role="status">
+    <button class="btn primary" onclick={explain}>
+      <Icon name="sparkle" size={18} />
+      <span>{selection ? `${t(lang, 'explain')} “${clip(selection.text)}”` : t(lang, 'explainVerse')}</span>
+    </button>
+    <button class="btn ghost x" onclick={exitSelect} aria-label={t(lang, 'exitSelect')} title={t(lang, 'exitSelect')}><Icon name="close" size={18} /></button>
+  </div>
+  {#if !selection}<p class="hint">{t(lang, 'selectHint')}</p>{/if}
+{/if}
 
 <style>
   .scroll {
@@ -138,7 +217,7 @@
   .heading, .parallel, .superscription, .lead, .text, .ref { text-align: var(--align, center); }
   .text {
     font-size: calc(23px * var(--font-scale));
-    line-height: 1.6;
+    line-height: var(--line-height, 1.45);
     color: var(--fg);
     word-break: normal;
     overflow-wrap: anywhere;
@@ -185,6 +264,49 @@
   .rail button:active, .rail button.on { background: var(--accent-soft); }
   .rail button.set { color: var(--accent); }
   .rail .like.liked { color: var(--heart); }
+  .rail .ai { color: var(--accent); }
+  .rail .ai.on { background: var(--accent); color: var(--accent-fg); }
+
+  /* Word buttons in select mode look like the text they are. */
+  .text.selecting { -webkit-user-select: none; user-select: none; }
+  .w {
+    display: inline;
+    padding: 0 1px;
+    margin: 0;
+    border-radius: 5px;
+    font: inherit;
+    color: inherit;
+    line-height: inherit;
+    text-align: inherit;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .text.red .w.wj { color: var(--wj); }
+  .w.sel { background: var(--mark); box-shadow: 0 0 0 2px var(--mark); }
+  .selbar {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    max-width: calc(100% - 120px);
+    z-index: 3;
+    animation: rise 160ms ease-out;
+  }
+  .selbar .btn.primary { min-width: 0; box-shadow: var(--pill-shadow); }
+  .selbar .btn.primary span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .selbar .btn.x { padding: 8px 10px; background: var(--bg-elev); box-shadow: var(--pill-shadow); }
+  .hint {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 70px);
+    text-align: center;
+    font-size: 13px;
+    color: var(--fg-muted);
+    margin: 0;
+    pointer-events: none;
+  }
 
   .burst {
     position: absolute;
@@ -205,6 +327,6 @@
     to { opacity: 1; transform: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .burst, .menu { animation: none; }
+    .burst, .menu, .selbar { animation: none; }
   }
 </style>

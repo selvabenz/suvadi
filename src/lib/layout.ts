@@ -71,3 +71,70 @@ export function layoutVerse(v: Verse): Line[] {
 export function plainText(v: Verse): string {
   return v.text;
 }
+
+export type WordItem =
+  | { t: 'word'; w: number; s: string; start: number; end: number; wj: boolean }
+  | { t: 'space'; s: string }
+  | { t: 'fn'; i: number }
+  | { t: 'x'; i: number };
+
+export interface WordLine {
+  style: string;
+  items: WordItem[];
+}
+
+/**
+ * Re-cut laid-out lines into tappable words for the explain/select mode.
+ * Splits on whitespace only, so punctuation stays with its word. Offsets index
+ * verse.text exactly like footnote positions (the "\n" between lines is one
+ * character). A word cut by a marker or a words-of-Jesus boundary becomes two
+ * fragments that share one word index `w`.
+ */
+export function splitWords(lines: Line[]): WordLine[] {
+  const out: WordLine[] = [];
+  let pos = 0;
+  let w = -1;
+  let inWord = false;
+  lines.forEach((line, li) => {
+    if (li > 0) {
+      pos += 1; // the "\n"
+      inWord = false;
+    }
+    const items: WordItem[] = [];
+    for (const part of line.parts) {
+      if (part.t !== 'text') {
+        items.push(part);
+        continue;
+      }
+      for (const piece of part.s.split(/(\s+)/)) {
+        if (!piece) continue;
+        if (/^\s+$/.test(piece)) {
+          items.push({ t: 'space', s: piece });
+          inWord = false;
+        } else {
+          if (!inWord) w++;
+          inWord = true;
+          items.push({ t: 'word', w, s: piece, start: pos, end: pos + piece.length, wj: part.wj });
+        }
+        pos += piece.length;
+      }
+    }
+    out.push({ style: line.style, items });
+  });
+  return out;
+}
+
+/** The selection covering words a..b (inclusive word indices); line breaks read as spaces. */
+export function selectionText(text: string, lines: WordLine[], a: number, b: number): { start: number; end: number; text: string } | null {
+  let start = -1;
+  let end = -1;
+  for (const line of lines) {
+    for (const it of line.items) {
+      if (it.t !== 'word' || it.w < a || it.w > b) continue;
+      if (start < 0 || it.start < start) start = it.start;
+      if (it.end > end) end = it.end;
+    }
+  }
+  if (start < 0) return null;
+  return { start, end, text: text.slice(start, end).replace(/\s*\n\s*/g, ' ') };
+}

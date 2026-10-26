@@ -26,7 +26,7 @@ export interface TranslationInfo {
   publisher?: string;
   licence?: { name: string; url?: string };
   /** Which shared study datasets apply to this text (English versification). */
-  study?: { xrefs?: boolean; words?: boolean };
+  study?: { xrefs?: boolean; words?: boolean; notes?: boolean };
   verseCount?: number;
 }
 
@@ -112,3 +112,13 @@ export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 /** Bundled Tamil typefaces (public/fonts). */
 export type FontId = 'meera' | 'mukta' | 'pavanam' | 'lohit' | 'tiro';
 export type Lang = 'ta' | 'en';
+
+/** Which tab the study sheet opens on; 'explain' opens Helps with the explain panel on top. */
+export type StudySection = 'notes' | 'footnotes' | 'xrefs' | 'words' | 'helps' | 'explain';
+
+/** A circled word or phrase: character offsets into verse.text (end exclusive), plus its text. */
+export interface Selection {
+  start: number;
+  end: number;
+  text: string;
+}

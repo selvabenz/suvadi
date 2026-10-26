@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Book, Manifest, Ref, TranslationInfo, Verse } from './lib/types';
-  import { DEFAULT_TRANSLATION, loadBook, loadManifest, loadTranslations } from './lib/data';
-  import { formatRef, nextChapter, prevChapter } from './lib/refs';
+  import type { Book, Manifest, Ref, Selection, StudySection, TranslationInfo, Verse } from './lib/types';
+  import { DEFAULT_TRANSLATION, getVerse, loadBook, loadManifest, loadTranslations } from './lib/data';
+  import { formatRef, nextChapter, prevChapter, refKey } from './lib/refs';
+  import { ask, AiError } from './lib/ai';
   import { t } from './lib/i18n';
   import { ESV_ID, EsvError, esvKey, setEsvKey } from './lib/esv';
   import Icon from './lib/components/Icon.svelte';
@@ -10,7 +11,6 @@
   import Feed from './lib/components/Feed.svelte';
   import Picker from './lib/components/Picker.svelte';
   import StudySheet from './lib/components/StudySheet.svelte';
-  import NoteSheet from './lib/components/NoteSheet.svelte';
   import PlanView from './lib/components/PlanView.svelte';
   import SavedView from './lib/components/SavedView.svelte';
   import SearchView from './lib/components/SearchView.svelte';
@@ -34,8 +34,7 @@
   let target = $state<Ref | null>(null);
   let current = $state<Ref>(app.place);
   let picker = $state(false);
-  let study = $state<{ r: Ref; v: Verse; section?: 'footnotes' | 'xrefs' } | null>(null);
-  let noteFor = $state<Ref | null>(null);
+  let study = $state<{ r: Ref; v: Verse; section?: StudySection; focus?: Selection | null } | null>(null);
   let toast = $state('');
   let offlineReady = $state(false);
   let loadedFor = DEFAULT_TRANSLATION;   // the translation `manifest` was loaded for
@@ -50,6 +49,7 @@
     document.documentElement.dataset.theme = app.settings.theme;
     document.documentElement.style.setProperty('--font-scale', String(app.settings.fontScale));
     document.documentElement.style.setProperty('--align', app.settings.textAlign);
+    document.documentElement.style.setProperty('--line-height', String(app.settings.lineHeight));
     document.documentElement.dataset.font = app.settings.font;
     document.documentElement.lang = lang;
   });
@@ -154,7 +154,7 @@
 
   // Desktop: the arrow keys change chapter like a swipe.
   function onKey(e: KeyboardEvent) {
-    if (view !== 'read' || picker || study || noteFor) return;
+    if (view !== 'read' || picker || study) return;
     if ((e.target as HTMLElement).closest('input, textarea')) return;
     if (e.key === 'ArrowRight') step(1);
     else if (e.key === 'ArrowLeft') step(-1);
@@ -180,13 +180,15 @@
     toastTimer = setTimeout(() => (toast = ''), 2600);
   }
 
-  function shareText(r: Ref, v: Verse): string {
+  /** The verse, its reference and, when given, the reader's own note under it. */
+  function shareText(r: Ref, v: Verse, note = ''): string {
     const label = formatRef(books, { book: r.book, ch: r.ch, v: v.n }, v.end);
-    return `${v.text}\n— ${label} (${manifest?.abbr ?? ''})`.replace(' ()', '');
+    const base = `${v.text}\n— ${label} (${manifest?.abbr ?? ''})`.replace(' ()', '');
+    return note.trim() ? `${base}\n\n${note.trim()}` : base;
   }
 
-  async function share(r: Ref, v: Verse) {
-    const text = shareText(r, v);
+  async function share(r: Ref, v: Verse, note = '') {
+    const text = shareText(r, v, note);
     try {
       if (navigator.share) {
         await navigator.share({ text });
@@ -209,9 +211,34 @@
     const ch = book?.chapters.find((c) => c.n === current.ch);
     const v = ch?.verses.find((x) => x.n === current.v) ?? ch?.verses.find((x) => x.n <= current.v && (x.end ?? x.n) >= current.v);
     if (!v) return;
-    const text = shareText({ book: current.book, ch: current.ch, v: v.n }, v);
+    whatsappText(shareText({ book: current.book, ch: current.ch, v: v.n }, v));
+  }
+
+  function whatsappText(text: string) {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
     showToast(t(lang, 'whatsapp'));
+  }
+
+  /** Saved > note: open the study sheet on the Notes tab for that verse. */
+  function editNote(r: Ref) {
+    const stub: Verse = { n: r.v, id: String(r.v), text: '' };
+    getVerse(translation, r)
+      .then((v) => (study = { r, v: v ?? stub, section: 'notes' }))
+      .catch(() => (study = { r, v: stub, section: 'notes' }));
+  }
+
+  /** Explain: send the question and what the sheet knows to the reader's AI service. */
+  async function askAi(message: string, r: Ref, v: Verse, sel: Selection | null): Promise<string> {
+    try {
+      return await ask(app.settings.aiEndpoint, app.settings.aiKey, {
+        message,
+        verse: { ref: formatRef(books, { book: r.book, ch: r.ch, v: v.n }, v.end), text: v.text, translation: manifest?.abbr ?? '' },
+        context: { selection: sel?.text },
+      });
+    } catch (e) {
+      const kind = e instanceof AiError ? e.kind : 'network';
+      throw new Error(t(lang, kind === 'noendpoint' ? 'aiNotSet' : kind === 'bad' ? 'aiBadReply' : 'aiFailed'));
+    }
   }
 
   function retry() {
@@ -236,11 +263,9 @@
         {meta}
         {books}
         {target}
-        {current}
         {lang}
         textLang={manifest.lang}
         redLetters={app.settings.redLetters}
-        showNumbers={app.settings.showNumbers}
         showRef={app.settings.showRef}
         showHeadings={app.settings.showHeadings}
         isBookmarked={(r) => app.isBookmarked(r)}
@@ -253,8 +278,9 @@
         onStudy={(r, v, section) => (study = { r, v, section })}
         onBookmark={(r) => app.toggleBookmark(r)}
         onLike={(r) => app.toggleLike(r)}
-        onNote={(r) => (noteFor = r)}
-        onShare={share}
+        onNote={(r, v) => (study = { r, v, section: 'notes' })}
+        onShare={(r, v) => share(r, v)}
+        onExplain={(r, v, focus) => (study = { r, v, section: 'explain', focus })}
       />
       <header class="top">
         <div class="pills">
@@ -272,7 +298,7 @@
     {:else if view === 'plan'}
       <PlanView {books} {lang} onNavigate={navigate} />
     {:else if view === 'saved'}
-      <SavedView {books} {lang} {translation} onNavigate={navigate} onEditNote={(r) => (noteFor = r)} />
+      <SavedView {books} {lang} {translation} onNavigate={navigate} onEditNote={editNote} />
     {:else if view === 'search'}
       <SearchView {books} {lang} {translation} onNavigate={navigate} />
     {:else}
@@ -297,20 +323,17 @@
         {books}
         {lang}
         {translation}
-        study={manifest.study}
+        {manifest}
         section={study.section}
+        focus={study.focus ?? null}
+        note={app.notes[refKey(study.r)]?.text ?? ''}
+        aiEnabled={!!app.settings.aiEndpoint.trim()}
+        onSaveNote={(text) => study && app.setNote(study.r, text)}
+        onShare={(n) => study && share(study.r, study.v, n)}
+        onWhatsApp={(n) => study && whatsappText(shareText(study.r, study.v, n))}
+        onAsk={(m, sel) => (study ? askAi(m, study.r, study.v, sel) : Promise.reject(new Error('')))}
         onNavigate={(r) => { study = null; navigate(r); }}
         onClose={() => (study = null)}
-      />
-    {/if}
-    {#if noteFor}
-      <NoteSheet
-        r={noteFor}
-        {books}
-        {lang}
-        initial={app.notes[`${noteFor.book}.${noteFor.ch}.${noteFor.v}`]?.text ?? ''}
-        onSave={(text) => { app.setNote(noteFor!, text); noteFor = null; }}
-        onClose={() => (noteFor = null)}
       />
     {/if}
   {/if}

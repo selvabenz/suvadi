@@ -43,7 +43,6 @@
   --wj: #b3261e;
   --mark: #ffe58a;
   --heart: #ef4060;
-  --rail: #c7c7cc;
   --pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 10px rgba(0, 0, 0, 0.06);
   --shadow: 0 -8px 30px rgba(0, 0, 0, 0.10);
   --align: center;
@@ -70,13 +69,11 @@
   --wj: #ff8a80;
   --mark: #6b5a1e;
   --heart: #ff5a75;
-  --rail: #48484d;
   --pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
 }
 
 :root[data-theme='sepia'] {
-  --rail: #cdb99c;
   --pill-shadow: 0 1px 3px rgba(80, 50, 20, 0.12);
   --bg: #f4e9d8;
   --bg-elev: #fbf4e8;
@@ -89,7 +86,6 @@
 
 /* Black and white: no colour at all, strong contrast. Red letters become bold. */
 :root[data-theme='mono'] {
-  --rail: #9a9a9a;
   --pill-shadow: 0 0 0 1px #000;
   --bg: #ffffff;
   --bg-elev: #ffffff;
@@ -108,7 +104,6 @@
 
 /* Teen: bright, warm and playful. */
 :root[data-theme='teen'] {
-  --rail: #ffb3d6;
   --pill-shadow: 0 2px 10px rgba(255, 45, 138, 0.15);
   --bg: #fff3f9;
   --bg-elev: #ffffff;
@@ -126,7 +121,6 @@
 
 /* Gen Z: dark with neon lime and violet. */
 :root[data-theme='genz'] {
-  --rail: #3d3670;
   --pill-shadow: 0 0 0 1px #2d2850;
   --bg: #0b0a14;
   --bg-elev: #17142a;
@@ -156,7 +150,6 @@
   --wj: #d9577a;
   --mark: #fff0a3;
   --heart: #f37fa0;
-  --rail: #cfc6ef;
   --pill-shadow: 0 1px 2px rgba(123, 108, 217, 0.10), 0 3px 12px rgba(123, 108, 217, 0.10);
   --shadow: 0 -8px 30px rgba(123, 108, 217, 0.16);
 }

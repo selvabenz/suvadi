@@ -121,6 +121,16 @@
       oninput={(e) => app.update('fontScale', Number((e.target as HTMLInputElement).value))}
       aria-label={t(lang, 'textSize')}
     />
+    <h3 class="sub">{t(lang, 'lineSpacing')} · {app.settings.lineHeight.toFixed(2)}</h3>
+    <input
+      type="range"
+      min="1.3"
+      max="2"
+      step="0.05"
+      value={app.settings.lineHeight}
+      oninput={(e) => app.update('lineHeight', Number((e.target as HTMLInputElement).value))}
+      aria-label={t(lang, 'lineSpacing')}
+    />
     <p class="sample" lang={manifest?.lang}>{manifest?.sample || 'ஆதியிலே தேவன் வானத்தையும் பூமியையும் படைத்தார்.'}</p>
   </section>
 
@@ -167,10 +177,6 @@
       <span>{t(lang, 'redLetters')}</span>
     </label>
     <label class="toggle">
-      <input type="checkbox" checked={app.settings.showNumbers} onchange={(e) => app.update('showNumbers', (e.target as HTMLInputElement).checked)} />
-      <span>{t(lang, 'showNumbers')}</span>
-    </label>
-    <label class="toggle">
       <input type="checkbox" checked={app.settings.showRef} onchange={(e) => app.update('showRef', (e.target as HTMLInputElement).checked)} />
       <span>{t(lang, 'showRef')}</span>
     </label>
@@ -187,7 +193,35 @@
       <li><span class="g">⋯</span>{t(lang, 'gestureLong')}</li>
       <li><span class="g">⇆</span>{t(lang, 'gestureSwipe')}</li>
       <li><span class="g">✌</span>{t(lang, 'gestureTwoFinger')}</li>
+      <li><span class="g">✦</span>{t(lang, 'gestureAi')}</li>
     </ul>
+  </section>
+
+  <section>
+    <h3>{t(lang, 'aiSection')}</h3>
+    <p class="muted small">{t(lang, 'aiHint')}</p>
+    <label class="keyfield">
+      <span class="small">{t(lang, 'aiEndpoint')}</span>
+      <input
+        type="url"
+        inputmode="url"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="https://…"
+        value={app.settings.aiEndpoint}
+        onchange={(e) => app.update('aiEndpoint', (e.target as HTMLInputElement).value.trim())}
+      />
+    </label>
+    <label class="keyfield">
+      <span class="small">{t(lang, 'aiKey')}</span>
+      <input
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        value={app.settings.aiKey}
+        onchange={(e) => app.update('aiKey', (e.target as HTMLInputElement).value.trim())}
+      />
+    </label>
   </section>
 
   <section>
@@ -213,6 +247,7 @@
       <li>{ESV_NOTICE} <a href="https://www.esv.org" target="_blank" rel="noopener">esv.org</a></li>
       <li>{t(lang, 'attrOpenBible')}</li>
       <li>{t(lang, 'attrStep')}</li>
+      {#if manifest?.study?.notes || translations.some((x) => x.study?.notes)}<li>{t(lang, 'attrUw')}</li>{/if}
       <li>{t(lang, 'attrFont')}</li>
       <li>{t(lang, 'attrCode')} <a href="https://github.com/selvabenz/suvadi" target="_blank" rel="noopener">github.com/selvabenz/suvadi</a></li>
     </ul>
@@ -259,7 +294,8 @@
   .align span:last-child { font-size: 12px; }
 
   input[type='range'] { width: 100%; padding: 0; border: 0; background: none; }
-  .sample { font-size: calc(22px * var(--font-scale)); line-height: 1.6; margin: 8px 0 0; text-align: var(--align, left); }
+  .sub { margin-top: 14px; }
+  .sample { font-size: calc(22px * var(--font-scale)); line-height: var(--line-height, 1.45); margin: 8px 0 0; text-align: var(--align, left); }
   .toggle { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
   .gestures { list-style: none; padding: 0; margin: 0; }
