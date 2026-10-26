@@ -1,7 +1,7 @@
 {
   "name": "suvadi",
   "private": true,
-  "version": "0.5.2",
+  "version": "0.5.3",
   "type": "module",
   "description": "Suvadi (சுவடி): the Bible in Indian languages, one verse at a time. An offline-first scrolling Bible reader (PWA).",
   "license": "GPL-3.0-only",
@@ -17,11 +17,13 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "data": "python tools/build_data.py",
     "data:test": "python -m unittest discover -s tools/tests -v",
     "data:migrate": "python tools/migrate_data.py"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.4",
     "@types/node": "^26.6.5",

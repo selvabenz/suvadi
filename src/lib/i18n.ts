@@ -146,8 +146,8 @@ const STRINGS = {
   offlineReady: { ta: 'இணையம் இல்லாமலும் வாசிக்கலாம்', en: 'Ready to read offline' },
   about: { ta: 'பற்றி', en: 'About' },
   aboutText: {
-    ta: 'சுவடி — இந்திய மொழிகளில் வேதாகமத்தை ஒரு நேரத்தில் ஒரு வசனமாக வாசிக்கும் செயலி. ஓலைச் சுவடியைப் போலவே, ஒவ்வொரு வசனமும் தனித் திரையில். வேத வசனங்கள் முழுவதும் சாதனத்தில் சேமிக்கப்பட்டு இணையம் இல்லாமலும் செயல்படும். உங்கள் அடையாளங்கள், குறிப்புகள், வாசிப்பு இடம் ஆகியவை இந்தச் சாதனத்தை விட்டு வெளியே செல்வதில்லை.',
-    en: 'Suvadi reads the Bible in Indian languages one verse at a time, like the palm-leaf manuscripts (suvadi) it is named after. The whole text is stored on the device and works offline. Bookmarks, notes and your reading position never leave this device.',
+    ta: 'சுவடி — இந்திய மொழிகளில் வேதாகமத்தை ஒரு நேரத்தில் ஒரு வசனமாக வாசிக்கும் செயலி. ஓலைச் சுவடியைப் போலவே, ஒவ்வொரு வசனமும் தனித் திரையில். செயலியை நிறுவும்போதே தமிழ் IRV முழுவதும் சாதனத்தில் சேமிக்கப்படும்; இணையம் இல்லாமலும் வாசிக்கலாம். மற்ற வேதாகமங்கள் நீங்கள் வாசிக்கும் பகுதிகள் சேமிக்கப்படும்; ESV-க்கு எப்போதும் இணையம் தேவை. உங்கள் அடையாளங்கள், குறிப்புகள், வாசிப்பு இடம் ஆகியவை இந்தச் சாதனத்தை விட்டு வெளியே செல்வதில்லை.',
+    en: 'Suvadi reads the Bible in Indian languages one verse at a time, like the palm-leaf manuscripts (suvadi) it is named after. The Tamil IRV is stored on the device when the app is installed and reads offline; other Bibles are saved as you read them, and the ESV always needs the internet. Bookmarks, notes and your reading position never leave this device.',
   },
   attributions: { ta: 'நன்றி மற்றும் உரிமங்கள்', en: 'Credits and licences' },
   attrScripture: { ta: 'வேத வசனங்கள்', en: 'Scripture' },

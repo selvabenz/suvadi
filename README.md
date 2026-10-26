@@ -60,6 +60,7 @@ npm install
 npm run check      # svelte-check
 npm run test       # vitest
 npm run build      # vite build -> dist/ (service worker included)
+npm run test:e2e   # browser tests of the built app (Playwright; PW_CHANNEL=msedge to use the installed Edge)
 npm run preview    # serve dist/ locally
 npm run dev        # dev server at http://localhost:5173
 ```
@@ -175,12 +176,15 @@ be **GitHub Actions** (once). A root domain needs a build with no `BASE_PATH`.
 
 ## Verified
 
-- `python -m unittest discover -s tools/tests`: 16 tests.
+- `python -m unittest discover -s tools/tests`: 37 parser and data tests.
 - Full data build on the 66 real IRV Tamil files: 1,189 chapters, 31,092 verse
   records (two are bridges: Luke 1:68-79, Revelation 12:17-18), 1,419
   footnotes, 3,414 cross-references.
-- `npm run check`, `npm run test`, `npm run build`: run by the deploy workflow
-  on every push.
+- `npm run check`, `npm run test` (50 unit tests), `npm run build` and
+  `npx playwright test` (14 browser tests in `e2e/`: reader speed and place,
+  long words, study page, notes to WhatsApp, explain, TV link / QR /
+  presenting, Bible menu, search and history, settings) run in the deploy
+  workflow on every push; a failing test stops the deploy.
 
 ## Open items
 
