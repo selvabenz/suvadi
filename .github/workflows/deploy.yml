@@ -52,6 +52,9 @@ jobs:
       - name: Build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # Crossway ESV API key (repository secret). Empty when the secret is
+          # not set: readers then paste their own key in Settings.
+          VITE_ESV_API_KEY: ${{ secrets.VITE_ESV_API_KEY }}
         run: |
           npm run build
           # GitHub Pages must serve dist/ as-is: no Jekyll processing.
