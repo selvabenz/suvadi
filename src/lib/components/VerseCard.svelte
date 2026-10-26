@@ -23,6 +23,7 @@
     onNote,
     onShare,
     onExplain,
+    onTv,
   }: {
     verse: Verse;
     label: string;
@@ -42,6 +43,7 @@
     onShare: () => void;
     /** Open the explain sheet for the circled words, or the whole verse. */
     onExplain: (sel: Selection | null) => void;
+    onTv: () => void;
   } = $props();
 
   const lines = $derived(layoutVerse(verse));
@@ -175,7 +177,8 @@
       <button onclick={() => onStudy()} aria-label={t(lang, 'study')} title={t(lang, 'study')}><Icon name="bulb" /></button>
       <button class:set={bookmarked} onclick={onBookmark} aria-pressed={bookmarked} aria-label={t(lang, 'bookmark')} title={t(lang, 'bookmark')}><Icon name="bookmark" filled={bookmarked} /></button>
       <button class:set={hasNote} onclick={onNote} aria-label={t(lang, 'note')} title={t(lang, 'note')}><Icon name="note" filled={hasNote} /></button>
-      <button onclick={onShare} aria-label={t(lang, 'share')} title={t(lang, 'share')}><Icon name="send" /></button>
+      <button onclick={onShare} aria-label={t(lang, 'share')} title={t(lang, 'share')}><Icon name="share" /></button>
+      <button onclick={() => { open = false; onTv(); }} aria-label={t(lang, 'tvOpen')} title={t(lang, 'tvOpen')}><Icon name="tv" /></button>
     </div>
   {/if}
   <button class="ai" class:on={selecting} onclick={sparkle} aria-pressed={selecting} aria-label={t(lang, 'explain')} title={t(lang, 'explain')}>

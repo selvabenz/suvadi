@@ -33,6 +33,7 @@
     onNote,
     onShare,
     onExplain,
+    onTv,
   }: {
     book: Book;
     meta: BookMeta;
@@ -58,6 +59,8 @@
     onNote: (r: Ref, v: Verse) => void;
     onShare: (r: Ref, v: Verse) => void;
     onExplain: (r: Ref, v: Verse, sel: Selection | null) => void;
+    /** open the "Show on a TV" sheet */
+    onTv: () => void;
   } = $props();
 
   const items = $derived.by<Item[]>(() => {
@@ -173,6 +176,7 @@
           onNote={() => onNote(ref, item.verse)}
           onShare={() => onShare(ref, item.verse)}
           onExplain={(sel) => onExplain(ref, item.verse, sel)}
+          {onTv}
         />
       </article>
     {:else}

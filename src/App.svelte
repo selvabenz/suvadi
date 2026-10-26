@@ -12,12 +12,17 @@
   import Feed from './lib/components/Feed.svelte';
   import Picker from './lib/components/Picker.svelte';
   import StudyPage from './lib/components/StudyPage.svelte';
+  import TvMode from './lib/components/TvMode.svelte';
+  import TvSheet from './lib/components/TvSheet.svelte';
+  import { appBase, parseAppUrl, receiverUrl, tvUrl } from './lib/url';
+  import { isReceiver, presentAvailable, presentSupported, sendRef, startPresenting, stopPresenting, type PresentConn, type TvMessage } from './lib/present';
+  import { copyText } from './lib/clipboard';
   import PlanView from './lib/components/PlanView.svelte';
   import SavedView from './lib/components/SavedView.svelte';
   import SearchView from './lib/components/SearchView.svelte';
   import SettingsView from './lib/components/SettingsView.svelte';
 
-  type View = 'read' | 'plan' | 'saved' | 'search' | 'settings';
+  type View = 'read' | 'plan' | 'saved' | 'search' | 'settings' | 'tv';
   // The bottom bar is icons only; the names are the accessible labels and tooltips.
   const NAV = [
     { view: 'read', icon: 'book', label: 'navRead' },
@@ -38,6 +43,14 @@
   let study = $state<{ r: Ref; v: Verse; section?: StudySection; focus?: Selection | null } | null>(null);
   let toast = $state('');
   let bookIndex = $state<BookIndex | null>(null);
+  // TV
+  let tvSheet = $state(false);
+  let canPresent = $state(false);
+  let presentConn = $state<PresentConn | null>(null);
+  let tvReceiver = $state(false);
+  let tvFromTap = $state(false);
+  let lastView: View = 'read';
+  let pushedTv = false; // the app added the #tv history entry (so Back can remove it)
   let offlineReady = $state(false);
   let loadedFor = DEFAULT_TRANSLATION;   // the translation `manifest` was loaded for
 
@@ -70,8 +83,11 @@
 
   async function start() {
     loadError = false;
+    // ?ref=JHN.3.16&t=ta-irv (deep link), ?tv=1 (TV mode), ?tv=1&receiver=1 (presented page)
+    const u = parseAppUrl(location.search, location.hash);
     try {
       translations = await loadTranslations();
+      if (u.translation && translations.some((x) => x.id === u.translation)) app.update('translation', u.translation);
       // A translation that was removed from the build falls back to the default.
       if (!translations.some((x) => x.id === translation) && translations.length) {
         app.update('translation', translations.some((x) => x.id === DEFAULT_TRANSLATION) ? DEFAULT_TRANSLATION : translations[0].id);
@@ -82,7 +98,15 @@
       loadedFor = app.settings.translation;
       manifest = await loadManifest(loadedFor);
       loadBookIndex(manifest).then((i) => (bookIndex = i)).catch(() => {});
-      await navigate(app.place, false);
+      await navigate(u.ref ?? app.place, !!u.ref);
+      if (u.tv) {
+        tvReceiver = u.receiver || isReceiver();
+        tvFromTap = false;
+        lastView = 'read';
+        view = 'tv';
+      }
+      // a refresh should reopen the reader, not replay the link
+      if (location.search) history.replaceState(null, '', location.pathname + (view === 'tv' ? '#tv' : ''));
     } catch {
       loadError = true;
     }
@@ -157,7 +181,7 @@
 
   // Desktop: the arrow keys change chapter like a swipe.
   function onKey(e: KeyboardEvent) {
-    if (view !== 'read' || picker || study) return;
+    if (view !== 'read' || picker || study || tvSheet) return;
     if ((e.target as HTMLElement).closest('input, textarea')) return;
     if (e.key === 'ArrowRight') step(1);
     else if (e.key === 'ArrowLeft') step(-1);
@@ -222,6 +246,80 @@
     showToast(t(lang, 'whatsapp'));
   }
 
+  // ---- TV ---------------------------------------------------------------
+  /** TV mode moves through verses without leaving the view (navigate() would). */
+  async function tvGo(r: Ref) {
+    if (await open(r)) onCurrent(r);
+  }
+  function enterTv(fromTap: boolean) {
+    tvSheet = false;
+    if (view !== 'tv') lastView = view;
+    tvFromTap = fromTap;
+    tvReceiver = false;
+    view = 'tv';
+    if (location.hash !== '#tv') {
+      history.pushState({ tv: 1 }, '', '#tv');
+      pushedTv = true;
+    }
+  }
+  function exitTv() {
+    if (view !== 'tv') return;
+    view = lastView === 'tv' ? 'read' : lastView;
+    if (location.hash === '#tv') {
+      // opened from a link, there is no app entry to go back to: just drop the hash
+      if (pushedTv) history.back();
+      else history.replaceState(null, '', location.pathname);
+    }
+    pushedTv = false;
+    if (view === 'read') target = { ...current };
+  }
+  function onPop() {
+    // the phone's or TV remote's Back button leaves TV mode
+    if (view === 'tv' && location.hash !== '#tv' && !tvReceiver) {
+      pushedTv = false;
+      view = lastView === 'tv' ? 'read' : lastView;
+      if (view === 'read') target = { ...current };
+    }
+  }
+  /** On the TV: the presenting browser moved to another verse or translation. */
+  function onRemote(m: TvMessage) {
+    if (m.translation !== translation && translations.some((x) => x.id === m.translation)) {
+      current = m.ref;
+      app.update('translation', m.translation);
+    } else tvGo(m.ref);
+  }
+  async function openTvSheet() {
+    tvSheet = true;
+    canPresent = presentSupported() && (await presentAvailable(receiverUrl(appBase())));
+  }
+  function present() {
+    // must stay the direct result of the click: the browser shows its display picker
+    startPresenting(receiverUrl(appBase()))
+      .then((c) => {
+        presentConn = c;
+        c.onconnect = () => sendRef(c, current, translation);
+        c.onclose = () => (presentConn = null);
+        c.onterminate = () => (presentConn = null);
+        sendRef(c, current, translation);
+        tvSheet = false;
+      })
+      .catch(() => showToast(t(lang, 'tvPresentFailed')));
+  }
+  function stopPresent() {
+    stopPresenting(presentConn);
+    presentConn = null;
+  }
+  // the TV follows the reader: every verse or translation change is sent
+  $effect(() => {
+    const c = presentConn;
+    const r = current;
+    const tr = translation;
+    if (c) sendRef(c, r, tr);
+  });
+  async function copyTvLink(url: string) {
+    showToast(t(lang, (await copyText(url)) ? 'copied' : 'copyFailed'));
+  }
+
   /** Saved > note: open the study sheet on the Notes tab for that verse. */
   function editNote(r: Ref) {
     const stub: Verse = { n: r.v, id: String(r.v), text: '' };
@@ -249,7 +347,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} onpopstate={onPop} />
 
 <div class="shell">
   {#if loadError}
@@ -260,7 +358,25 @@
   {:else if !manifest || !book || !meta}
     <div class="center muted">{t(lang, 'loading')}</div>
   {:else}
-    {#if view === 'read'}
+    {#if view === 'tv'}
+      <TvMode
+        {book}
+        {meta}
+        {books}
+        {current}
+        {lang}
+        textLang={manifest.lang}
+        abbr={manifest.abbr}
+        redLetters={app.settings.redLetters}
+        theme={app.settings.tvTheme}
+        autoAdvance={app.settings.tvAutoAdvance}
+        receiver={tvReceiver}
+        fromTap={tvFromTap}
+        onGo={tvGo}
+        {onRemote}
+        onExit={exitTv}
+      />
+    {:else if view === 'read'}
       <Feed
         {book}
         {meta}
@@ -284,6 +400,7 @@
         onNote={(r, v) => (study = { r, v, section: 'notes' })}
         onShare={(r, v) => share(r, v)}
         onExplain={(r, v, focus) => (study = { r, v, section: 'explain', focus })}
+        onTv={openTvSheet}
       />
       <header class="top">
         <div class="pills">
@@ -305,10 +422,10 @@
     {:else if view === 'search'}
       <SearchView {books} {lang} {translation} index={bookIndex} onNavigate={navigate} />
     {:else}
-      <SettingsView {lang} {offlineReady} {translations} {manifest} />
+      <SettingsView {lang} {offlineReady} {translations} {manifest} onTvSheet={openTvSheet} />
     {/if}
 
-    {#if !study}
+    {#if !study && view !== 'tv'}
       <nav class="bottom" aria-label="main">
         {#each NAV as n (n.view)}
           <button class:on={view === n.view} onclick={() => (view = n.view)} aria-label={t(lang, n.label)} title={t(lang, n.label)} aria-current={view === n.view ? 'page' : undefined}>
@@ -318,6 +435,19 @@
       </nav>
     {/if}
 
+    {#if tvSheet}
+      <TvSheet
+        {lang}
+        url={tvUrl(appBase(), current, translation)}
+        {canPresent}
+        presenting={!!presentConn}
+        onTvHere={() => enterTv(true)}
+        onPresent={present}
+        onStopPresent={stopPresent}
+        onCopy={copyTvLink}
+        onClose={() => (tvSheet = false)}
+      />
+    {/if}
     {#if picker}
       <Picker {books} {current} {lang} index={bookIndex} onPick={(r) => { picker = false; navigate(r); }} onClose={() => (picker = false)} />
     {/if}

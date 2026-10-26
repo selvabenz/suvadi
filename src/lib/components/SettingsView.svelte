@@ -174,7 +174,7 @@
     <section class="group">
       <h3 class="label"><Icon name="tv" size={15} /> {t(lang, 'tv')}</h3>
       <div class="card rows">
-        <button class="row" onclick={onTvSheet}>
+        <button class="row tvopen" onclick={onTvSheet}>
           <span class="lead"><Icon name="cast" size={20} /></span>
           <span class="rl"><span>{t(lang, 'tvOpen')}</span><span class="sub">{t(lang, 'tvOpenSub')}</span></span>
           <span class="trail"><Icon name="chevron-right" size={18} /></span>
