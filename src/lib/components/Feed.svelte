@@ -15,7 +15,9 @@
     meta,
     books,
     target,
+    current,
     lang,
+    textLang,
     redLetters,
     showNumbers,
     showRef,
@@ -37,7 +39,9 @@
     meta: BookMeta;
     books: BookMeta[];
     target: Ref | null;
+    current: Ref;
     lang: Lang;
+    textLang: string;
     redLetters: boolean;
     showNumbers: boolean;
     showRef: boolean;
@@ -47,7 +51,7 @@
     hasNote: (r: Ref) => boolean;
     onCurrent: (r: Ref) => void;
     onNavigate: (r: Ref) => void;
-    /** Horizontal swipe: 1 = next chapter (swipe left), -1 = previous (swipe right). */
+    /** Horizontal swipe: 1 = next chapter (swipe right), -1 = previous (swipe left). */
     onStep: (dir: 1 | -1) => void;
     /** Two-finger tap: share the verse on screen on WhatsApp. */
     onWhatsApp: () => void;
@@ -124,12 +128,25 @@
     });
   });
 
+  // The verse-number rail on the left edge: one tick per verse of the chapter
+  // on screen, the current verse drawn long and numbered, the last numbered at the foot.
+  const railVerses = $derived(
+    current.book === book.code ? book.chapters.find((c) => c.n === current.ch)?.verses ?? [] : [],
+  );
+  const railLast = $derived(railVerses.length ? railVerses[railVerses.length - 1] : null);
+  function isCurrent(v: Verse): boolean {
+    return current.v >= v.n && current.v <= (v.end ?? v.n);
+  }
+  function jump(v: Verse) {
+    onNavigate({ book: book.code, ch: current.ch, v: v.n });
+  }
+
   function label(ch: number, v: Verse): string {
     return showRef ? `${meta.name} ${ch}:${v.id}` : meta.name;
   }
 </script>
 
-<div class="feed" bind:this={container} use:swipe={{ onSwipe: (d) => onStep(d === 'left' ? 1 : -1) }} use:twoFingerTap={{ onTap: onWhatsApp }}>
+<div class="feed" bind:this={container} use:swipe={{ onSwipe: (d) => onStep(d === 'right' ? 1 : -1) }} use:twoFingerTap={{ onTap: onWhatsApp }}>
   {#each items as item (item.key)}
     {#if item.kind === 'intro'}
       <article class="card intro" data-key="intro">
@@ -157,8 +174,8 @@
           verse={item.verse}
           label={label(item.ch, item.verse)}
           {lang}
+          {textLang}
           {redLetters}
-          {showNumbers}
           {showHeadings}
           bookmarked={isBookmarked(ref)}
           liked={isLiked(ref)}
@@ -172,6 +189,16 @@
       </article>
     {:else}
       <article class="card end" data-key="end">
+        {#if book.partial}
+          <!-- An online translation holds one chapter at a time: continue chapter by chapter. -->
+          <div class="scroll center">
+            <h2>{meta.name} {book.chapters[0]?.n}</h2>
+            <div class="endbtns">
+              <button class="btn ghost" onclick={() => onStep(-1)}>← {t(lang, 'prevChapter')}</button>
+              <button class="btn primary" onclick={() => onStep(1)}>{t(lang, 'nextChapter')} →</button>
+            </div>
+          </div>
+        {:else}
         <div class="scroll center">
           <p class="muted">{nextBook ? t(lang, 'endOfBook') : t(lang, 'endOfBible')}</p>
           <h2>{meta.long || meta.name}</h2>
@@ -184,10 +211,24 @@
             {/if}
           </div>
         </div>
+        {/if}
       </article>
     {/if}
   {/each}
 </div>
+
+{#if showNumbers && railVerses.length > 1}
+  <nav class="vrail" aria-label={t(lang, 'verses')}>
+    <div class="ticks">
+      {#each railVerses as v (v.n)}
+        <button class="tick" class:cur={isCurrent(v)} onclick={() => jump(v)} aria-label="{t(lang, 'verse')} {v.id}" aria-current={isCurrent(v) ? 'true' : undefined}>
+          <i></i>{#if isCurrent(v)}<span>{v.id}</span>{/if}
+        </button>
+      {/each}
+    </div>
+    {#if railLast && !isCurrent(railLast)}<span class="last">{railLast.id}</span>{/if}
+  </nav>
+{/if}
 
 <style>
   .feed {
@@ -201,6 +242,7 @@
     touch-action: pan-y;
   }
   .card {
+    position: relative;
     height: 100dvh;
     scroll-snap-align: start;
     scroll-snap-stop: always;
@@ -221,4 +263,42 @@
   .intro p.io { padding-left: 1em; color: var(--fg-muted); }
   .foot { padding-top: 12px; display: flex; justify-content: center; }
   .endbtns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+  .vrail {
+    position: absolute;
+    left: 0;
+    top: calc(var(--top-h) + var(--safe-top) + 18px);
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 10px);
+    width: 30px;
+    display: flex;
+    flex-direction: column;
+    z-index: 3;
+  }
+  .ticks { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tick {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 26px;
+    display: flex;
+    align-items: center;
+    padding: 0 0 0 7px;
+  }
+  .tick i {
+    display: block;
+    width: 2px;
+    height: calc(100% - 3px);
+    min-height: 1px;
+    border-radius: 2px;
+    background: var(--rail);
+  }
+  .tick.cur i { width: 4px; height: 26px; min-height: 26px; background: var(--fg); }
+  .tick span {
+    position: absolute;
+    left: 15px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .last { padding: 8px 0 0 9px; font-size: 12px; color: var(--fg-muted); }
 </style>

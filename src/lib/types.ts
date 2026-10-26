@@ -91,6 +91,8 @@ export interface Book {
   names: Record<string, string>;
   intro: IntroBlock[];
   chapters: Chapter[];
+  /** Only some chapters are present (online translations load one chapter at a time). */
+  partial?: boolean;
 }
 
 /** OpenBible cross-reference: [toBook, ch, v, vEnd|0, votes] */
@@ -105,7 +107,7 @@ export interface Ref {
   v: number;
 }
 
-export type Theme = 'light' | 'dark' | 'sepia' | 'system' | 'mono' | 'teen' | 'genz';
+export type Theme = 'light' | 'dark' | 'sepia' | 'system' | 'mono' | 'teen' | 'genz' | 'pastel';
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 /** Bundled Tamil typefaces (public/fonts). */
 export type FontId = 'meera' | 'mukta' | 'pavanam' | 'lohit' | 'tiro';

@@ -2,6 +2,7 @@
   import type { FontId, Lang, Manifest, TextAlign, Theme, TranslationInfo } from '../types';
   import { t, type StringKey } from '../i18n';
   import { app } from '../state.svelte';
+  import { ESV_ID, ESV_NOTICE, hasBuildKey } from '../esv';
 
   let {
     lang,
@@ -18,13 +19,14 @@
 
   // Each theme swatch previews its own colours, whatever theme is active.
   const themes: { id: Theme; key: StringKey; bg: string; fg: string; accent: string }[] = [
-    { id: 'system', key: 'themeSystem', bg: 'linear-gradient(135deg, #faf7f2 50%, #15120f 50%)', fg: '#221a14', accent: '#5b3a1e' },
-    { id: 'light', key: 'themeLight', bg: '#faf7f2', fg: '#221a14', accent: '#5b3a1e' },
+    { id: 'system', key: 'themeSystem', bg: 'linear-gradient(135deg, #f9f9fb 50%, #111113 50%)', fg: '#1d1d1f', accent: '#86868b' },
+    { id: 'light', key: 'themeLight', bg: '#f9f9fb', fg: '#1d1d1f', accent: '#1d1d1f' },
     { id: 'sepia', key: 'themeSepia', bg: '#f4e9d8', fg: '#3b2a1a', accent: '#6f4a26' },
-    { id: 'dark', key: 'themeDark', bg: '#15120f', fg: '#efe8df', accent: '#d9b280' },
+    { id: 'dark', key: 'themeDark', bg: '#111113', fg: '#f2f2f5', accent: '#f2f2f5' },
     { id: 'mono', key: 'themeMono', bg: '#ffffff', fg: '#000000', accent: '#000000' },
     { id: 'teen', key: 'themeTeen', bg: '#fff3f9', fg: '#2b1a3f', accent: '#ff2d8a' },
     { id: 'genz', key: 'themeGenz', bg: '#0b0a14', fg: '#f2f0ff', accent: '#c6ff3d' },
+    { id: 'pastel', key: 'themePastel', bg: 'linear-gradient(135deg, #e7f7ef, #fbf8f1 50%, #fde7ef)', fg: '#33304a', accent: '#7b6cd9' },
   ];
   const aligns: { id: TextAlign; key: StringKey }[] = [
     { id: 'left', key: 'alignLeft' },
@@ -39,6 +41,7 @@
     { id: 'lohit', name: 'Lohit Tamil' },
     { id: 'tiro', name: 'Tiro Tamil' },
   ];
+  const esvUsable = $derived(hasBuildKey() || !!app.settings.esvKey);
   const version: string = __APP_VERSION__;
 </script>
 
@@ -58,12 +61,32 @@
       <h3>{t(lang, 'translation')}</h3>
       <div class="list">
         {#each translations as tr (tr.id)}
-          <button class="opt" class:on={app.settings.translation === tr.id} onclick={() => app.update('translation', tr.id)} lang={tr.lang}>
-            <span class="tname">{tr.name}</span>
+          <button
+            class="opt"
+            class:on={app.settings.translation === tr.id}
+            disabled={tr.id === ESV_ID && !esvUsable}
+            onclick={() => app.update('translation', tr.id)}
+            lang={tr.lang}
+          >
+            <span class="tname">{tr.name}{#if tr.id === ESV_ID} <span class="tag">{t(lang, 'online')}</span>{/if}</span>
             <span class="muted small">{tr.nameEn}</span>
           </button>
         {/each}
       </div>
+      {#if !hasBuildKey()}
+        <label class="keyfield">
+          <span class="small">{t(lang, 'esvKey')}</span>
+          <input
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            value={app.settings.esvKey}
+            onchange={(e) => app.update('esvKey', (e.target as HTMLInputElement).value.trim())}
+            placeholder="Token…"
+          />
+          <span class="muted small">{t(lang, 'esvKeyHint')}</span>
+        </label>
+      {/if}
     </section>
   {/if}
 
@@ -187,6 +210,7 @@
           {t(lang, 'attrScripture')}: {attribution(tr)}{#if tr.licence?.url}<a href={tr.licence.url} target="_blank" rel="noopener">{tr.licence.name}</a>.{:else if tr.licence}{tr.licence.name}.{/if}
         </li>
       {/each}
+      <li>{ESV_NOTICE} <a href="https://www.esv.org" target="_blank" rel="noopener">esv.org</a></li>
       <li>{t(lang, 'attrOpenBible')}</li>
       <li>{t(lang, 'attrStep')}</li>
       <li>{t(lang, 'attrFont')}</li>
@@ -206,6 +230,8 @@
   .opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; text-align: left; }
   .opt.on { border-color: var(--accent); background: var(--accent-soft); }
   .opt .tname { font-weight: 700; }
+  .opt .tag { font-weight: 400; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--fg-muted); vertical-align: middle; }
+  .keyfield { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .opt.font .fsample { font-size: calc(18px * var(--font-scale)); line-height: 1.5; }
 
   .themes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

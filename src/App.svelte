@@ -4,6 +4,8 @@
   import { DEFAULT_TRANSLATION, loadBook, loadManifest, loadTranslations } from './lib/data';
   import { formatRef, nextChapter, prevChapter } from './lib/refs';
   import { t } from './lib/i18n';
+  import { ESV_ID, EsvError, esvKey, setEsvKey } from './lib/esv';
+  import Icon from './lib/components/Icon.svelte';
   import { app } from './lib/state.svelte';
   import Feed from './lib/components/Feed.svelte';
   import Picker from './lib/components/Picker.svelte';
@@ -15,6 +17,14 @@
   import SettingsView from './lib/components/SettingsView.svelte';
 
   type View = 'read' | 'plan' | 'saved' | 'search' | 'settings';
+  // The bottom bar is icons only; the names are the accessible labels and tooltips.
+  const NAV = [
+    { view: 'read', icon: 'book', label: 'navRead' },
+    { view: 'plan', icon: 'calendar', label: 'navPlan' },
+    { view: 'saved', icon: 'bookmark', label: 'navSaved' },
+    { view: 'search', icon: 'search', label: 'navSearch' },
+    { view: 'settings', icon: 'settings', label: 'navSettings' },
+  ] as const;
 
   let translations = $state<TranslationInfo[]>([]);
   let manifest = $state<Manifest | null>(null);
@@ -44,6 +54,18 @@
     document.documentElement.lang = lang;
   });
 
+  $effect(() => setEsvKey(app.settings.esvKey));
+
+  /** The message for a failed load: the ESV has its own reasons (key, rate limit). */
+  function failMessage(e: unknown): string {
+    if (e instanceof EsvError) {
+      if (e.kind === 'nokey') return t(lang, 'esvNeedsKey');
+      if (e.kind === 'auth') return t(lang, 'esvBadKey');
+      if (e.kind === 'limit') return t(lang, 'esvLimit');
+    }
+    return t(lang, 'loadFailed');
+  }
+
   async function start() {
     loadError = false;
     try {
@@ -52,6 +74,9 @@
       if (!translations.some((x) => x.id === translation) && translations.length) {
         app.update('translation', translations.some((x) => x.id === DEFAULT_TRANSLATION) ? DEFAULT_TRANSLATION : translations[0].id);
       }
+      // The ESV needs an API key; without one, open the bundled text instead.
+      setEsvKey(app.settings.esvKey);
+      if (app.settings.translation === ESV_ID && !esvKey()) app.update('translation', DEFAULT_TRANSLATION);
       loadedFor = app.settings.translation;
       manifest = await loadManifest(loadedFor);
       await navigate(app.place, false);
@@ -72,26 +97,36 @@
   $effect(() => {
     const id = translation;
     if (!manifest || id === loadedFor) return;
+    const previous = loadedFor;
     loadedFor = id;
     const place = current;
     loadManifest(id)
       .then(async (m) => {
+        const oldManifest = manifest;
+        const oldBook = book;
         manifest = m;
         book = null;
         // Reopen the same verse in the new translation without leaving the
-        // current tab (the reader is on Settings when this happens).
-        await open(place);
+        // current tab (the reader is on Settings when this happens). If the
+        // text cannot be loaded (an ESV key problem), go back to the previous one.
+        if (!(await open(place))) {
+          manifest = oldManifest;
+          book = oldBook;
+          loadedFor = previous;
+          app.update('translation', previous);
+        }
       })
       .catch(() => showToast(t(lang, 'loadFailed')));
   });
 
   /** Load the book for `ref` (in the chosen translation) and point the feed at it. */
   async function open(ref: Ref): Promise<boolean> {
-    if (!book || book.code !== ref.book) {
+    const have = book && book.code === ref.book && (!book.partial || book.chapters.some((c) => c.n === ref.ch));
+    if (!have) {
       try {
-        book = await loadBook(app.settings.translation, ref.book);
-      } catch {
-        showToast(t(lang, 'loadFailed'));
+        book = await loadBook(app.settings.translation, ref.book, ref.ch);
+      } catch (e) {
+        showToast(failMessage(e));
         return false;
       }
     }
@@ -117,11 +152,32 @@
     if (next) navigate({ book: next.book, ch: next.ch, v: 1 });
   }
 
+  // Desktop: the arrow keys change chapter like a swipe.
+  function onKey(e: KeyboardEvent) {
+    if (view !== 'read' || picker || study || noteFor) return;
+    if ((e.target as HTMLElement).closest('input, textarea')) return;
+    if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'ArrowLeft') step(-1);
+  }
+
+  /** The top-left pill: switch between the available translations in one tap. */
+  function nextTranslation() {
+    const usable = translations.filter((x) => x.id !== ESV_ID || esvKey());
+    if (usable.length < 2) {
+      view = 'settings';
+      return;
+    }
+    const i = usable.findIndex((x) => x.id === translation);
+    app.update('translation', usable[(i + 1) % usable.length].id);
+  }
+
+  const chapterLabel = $derived(books.find((b) => b.code === current.book)?.name ?? '');
+
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   function showToast(msg: string) {
     toast = msg;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => (toast = ''), 1800);
+    toastTimer = setTimeout(() => (toast = ''), 2600);
   }
 
   function shareText(r: Ref, v: Verse): string {
@@ -163,6 +219,8 @@
   }
 </script>
 
+<svelte:window onkeydown={onKey} />
+
 <div class="shell">
   {#if loadError}
     <div class="center">
@@ -178,7 +236,9 @@
         {meta}
         {books}
         {target}
+        {current}
         {lang}
+        textLang={manifest.lang}
         redLetters={app.settings.redLetters}
         showNumbers={app.settings.showNumbers}
         showRef={app.settings.showRef}
@@ -197,9 +257,17 @@
         onShare={share}
       />
       <header class="top">
-        <button class="nav" onclick={() => step(-1)} aria-label="previous chapter">‹</button>
-        <button class="title" onclick={() => (picker = true)}>{currentLabel} ▾</button>
-        <button class="nav" onclick={() => step(1)} aria-label="next chapter">›</button>
+        <div class="pills">
+          <button class="pill nav" onclick={() => step(-1)} aria-label={t(lang, 'prevChapter')} title={t(lang, 'prevChapter')}><Icon name="chevron-left" size={18} /></button>
+          <button class="pill tr" onclick={nextTranslation} aria-label={t(lang, 'translation')} title={t(lang, 'translation')}>{manifest.abbr}</button>
+        </div>
+        <div class="pills">
+          <button class="pill title" onclick={() => (picker = true)} aria-label={currentLabel}>
+            <span>{chapterLabel} <span class="ch">{current.ch}</span></span>
+            <Icon name="chevron-down" size={16} />
+          </button>
+          <button class="pill nav" onclick={() => step(1)} aria-label={t(lang, 'nextChapter')} title={t(lang, 'nextChapter')}><Icon name="chevron-right" size={18} /></button>
+        </div>
       </header>
     {:else if view === 'plan'}
       <PlanView {books} {lang} onNavigate={navigate} />
@@ -212,11 +280,11 @@
     {/if}
 
     <nav class="bottom" aria-label="main">
-      <button class:on={view === 'read'} onclick={() => (view = 'read')}><span class="ic">📖</span>{t(lang, 'navRead')}</button>
-      <button class:on={view === 'plan'} onclick={() => (view = 'plan')}><span class="ic">▦</span>{t(lang, 'navPlan')}</button>
-      <button class:on={view === 'saved'} onclick={() => (view = 'saved')}><span class="ic">★</span>{t(lang, 'navSaved')}</button>
-      <button class:on={view === 'search'} onclick={() => (view = 'search')}><span class="ic">⌕</span>{t(lang, 'navSearch')}</button>
-      <button class:on={view === 'settings'} onclick={() => (view = 'settings')}><span class="ic">⚙</span>{t(lang, 'navSettings')}</button>
+      {#each NAV as n (n.view)}
+        <button class:on={view === n.view} onclick={() => (view = n.view)} aria-label={t(lang, n.label)} title={t(lang, n.label)} aria-current={view === n.view ? 'page' : undefined}>
+          <Icon name={n.icon} size={24} stroke={view === n.view ? 2.1 : 1.6} />
+        </button>
+      {/each}
     </nav>
 
     {#if picker}
@@ -259,13 +327,27 @@
     position: absolute;
     top: 0; left: 0; right: 0;
     height: calc(var(--top-h) + var(--safe-top));
-    padding-top: var(--safe-top);
+    padding: var(--safe-top) 14px 0;
     display: flex; align-items: center; justify-content: space-between;
-    background: linear-gradient(var(--bg) 70%, transparent);
+    background: linear-gradient(var(--bg) 65%, transparent);
     z-index: 5;
+    pointer-events: none;
   }
-  .top .title { flex: 1; font-weight: 700; color: var(--accent); font-size: 16px; padding: 10px; }
-  .top .nav { font-size: 28px; padding: 0 18px; color: var(--fg-muted); line-height: 1; }
+  .pills { display: flex; gap: 8px; pointer-events: auto; }
+  .pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 38px; min-width: 38px; padding: 0 14px;
+    border-radius: 999px;
+    background: var(--bg-elev);
+    color: var(--fg);
+    box-shadow: var(--pill-shadow);
+    font-size: 15px;
+  }
+  .pill.nav { padding: 0; color: var(--fg-muted); }
+  .pill.tr { font-weight: 700; letter-spacing: 0.02em; }
+  .pill.title { max-width: 52vw; }
+  .pill.title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill.title .ch { color: var(--fg-muted); }
   .bottom {
     position: absolute;
     left: 0; right: 0; bottom: 0;
@@ -276,9 +358,8 @@
     border-top: 1px solid var(--line);
     z-index: 5;
   }
-  .bottom button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 11px; color: var(--fg-muted); }
-  .bottom button.on { color: var(--accent); font-weight: 700; }
-  .bottom .ic { font-size: 18px; line-height: 1.2; }
+  .bottom button { display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+  .bottom button.on { color: var(--fg); }
   .toast {
     position: absolute; left: 50%; bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
     transform: translateX(-50%);

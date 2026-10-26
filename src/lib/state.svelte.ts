@@ -23,6 +23,7 @@ export interface Settings {
   showHeadings: boolean;  // section headings and parallel-passage lines
   textAlign: TextAlign;
   font: FontId;
+  esvKey: string;         // the reader's own ESV API key, kept on this device only
 }
 
 export interface Bookmark { at: string }
@@ -42,7 +43,7 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true, showRef: true, showHeadings: true, textAlign: 'left', font: 'meera' },
+  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true, showRef: true, showHeadings: true, textAlign: 'center', font: 'meera', esvKey: '' },
   place: { book: 'JHN', ch: 1, v: 1 },
   bookmarks: {},
   likes: {},

@@ -18,12 +18,12 @@ Live: <https://selvabenz.github.io/suvadi/> (published from `main` by GitHub Act
 
 | Tab | What it does |
 |---|---|
-| **வாசி / Read** | One verse per screen, vertical snap scroll. Section headings and Psalm titles appear above the verse they introduce. Words of Jesus in red (switchable). Footnote and cross-reference markers inline. Double-tap a verse to like it (red heart); long-press, or tap ⋯, for the icon-only study, bookmark, note and share menu. Swipe left for the next chapter, right for the previous one. Tap with two fingers to share the verse on WhatsApp. Book introductions (the translation's own `\ip` paragraphs) are the first card of each book. |
+| **வாசி / Read** | One verse per screen, vertical snap scroll. Section headings and Psalm titles appear above the verse they introduce. Words of Jesus in red (switchable). Footnote and cross-reference markers inline. Double-tap a verse to like it (red heart); long-press, or tap ⋯, for the icon-only study, bookmark, note and share menu. Swipe right for the next chapter, left for the previous one (or the arrow keys on a desktop). A verse-number rail on the left edge marks the current verse; tap a tick to jump. Tap with two fingers to share the verse on WhatsApp. Book introductions (the translation's own `\ip` paragraphs) are the first card of each book. |
 | **Study sheet** | For the current verse: heading and parallel passage, the translation's footnotes and its own cross-references (tap to go), OpenBible.info related verses with a text preview, and the Hebrew/Greek words of the verse with transliteration, English gloss, Strong's number and morphology from STEP Bible. |
 | **திட்டம் / Plan** | Four plans computed from the canon: whole Bible in a year, NT in 90 days, Psalms in 30, Gospels in 40. Per-day chapter ranges, mark done, days behind, reading streak. |
 | **சேமித்தவை / Saved** | Bookmarks, liked verses and notes, stored only on the device. |
 | **தேடு / Search** | A typed reference ("யோவா 3:16", "John 3:16") or a substring search over the whole Bible. |
-| **அமைப்புகள் / Settings** | App language (Tamil or English UI), Bible translation (when more than one is shipped), theme (system, light, sepia, dark, black and white, Teen, Gen Z), text size, text alignment (left, centre, right, justify), red letters, verse numbers, chapter:verse label, section headings, font (Meera Inimai, Mukta Malar, Pavanam, Lohit Tamil, Tiro Tamil), credits. | |
+| **அமைப்புகள் / Settings** | App language (Tamil or English UI), Bible translation (when more than one is shipped), theme (system, light, sepia, dark, black and white, Teen, Gen Z, Pastel), text size, text alignment (left, centre, right, justify), red letters, verse numbers, chapter:verse label, section headings, font (Meera Inimai, Mukta Malar, Pavanam, Lohit Tamil, Tiro Tamil), credits. | |
 
 Everything the reader does stays in `localStorage` on the device. There is no
 account, no server and no analytics.
@@ -95,6 +95,16 @@ data uses should be built with `--no-study`.
 What is still single-language: the UI strings (`src/lib/i18n.ts`, Tamil and
 English), the bundled font (Meera Inimai; other scripts fall back to the
 system font), and the typed-reference parser's English book names.
+
+## ESV (online only)
+
+The English Standard Version is © Crossway and is not bundled. The app reads it
+from Crossway's ESV API (https://api.esv.org) one chapter at a time, keeps at
+most 500 verses in memory and never writes ESV text to the device. It needs an
+API key: set `VITE_ESV_API_KEY` at build time, or each reader pastes their own
+key in Settings. The ESV copyright notice is shown in Settings > Credits, and
+shared verses end with "(ESV)". Use is limited to Crossway's non-commercial API
+terms.
 
 ## Deploy
 

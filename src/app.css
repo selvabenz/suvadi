@@ -31,19 +31,22 @@
   --font: var(--font-family), 'Nirmala UI', 'Tamil Sangam MN', 'Latha', system-ui, sans-serif;
   --font-scale: 1;
 
-  --bg: #faf7f2;
+  /* Light: near-white and neutral grey, black for emphasis (the reference design). */
+  --bg: #f9f9fb;
   --bg-elev: #ffffff;
-  --fg: #221a14;
-  --fg-muted: #6b5f55;
-  --line: #e4dcd2;
-  --accent: #5b3a1e;
+  --fg: #1d1d1f;
+  --fg-muted: #86868b;
+  --line: #e8e8ed;
+  --accent: #1d1d1f;
   --accent-fg: #ffffff;
-  --accent-soft: #efe4d6;
-  --wj: #a1261e;
-  --mark: #d8b56a;
-  --heart: #e0245e;
-  --shadow: 0 -8px 30px rgba(0, 0, 0, 0.12);
-  --align: left;
+  --accent-soft: #ededf2;
+  --wj: #b3261e;
+  --mark: #ffe58a;
+  --heart: #ef4060;
+  --rail: #c7c7cc;
+  --pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 10px rgba(0, 0, 0, 0.06);
+  --shadow: 0 -8px 30px rgba(0, 0, 0, 0.10);
+  --align: center;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -56,20 +59,25 @@
 :root[data-font='tiro'] { --font-family: 'Tiro Tamil'; }
 
 :root[data-theme='dark'] {
-  --bg: #15120f;
-  --bg-elev: #221d18;
-  --fg: #efe8df;
-  --fg-muted: #a8988a;
-  --line: #3a312a;
-  --accent: #d9b280;
-  --accent-fg: #1b130c;
-  --accent-soft: #33281e;
-  --wj: #f08a7e;
-  --mark: #8b7236;
+  --bg: #111113;
+  --bg-elev: #1c1c1f;
+  --fg: #f2f2f5;
+  --fg-muted: #98989f;
+  --line: #2c2c30;
+  --accent: #f2f2f5;
+  --accent-fg: #111113;
+  --accent-soft: #2a2a2e;
+  --wj: #ff8a80;
+  --mark: #6b5a1e;
+  --heart: #ff5a75;
+  --rail: #48484d;
+  --pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
 }
 
 :root[data-theme='sepia'] {
+  --rail: #cdb99c;
+  --pill-shadow: 0 1px 3px rgba(80, 50, 20, 0.12);
   --bg: #f4e9d8;
   --bg-elev: #fbf4e8;
   --fg: #3b2a1a;
@@ -81,6 +89,8 @@
 
 /* Black and white: no colour at all, strong contrast. Red letters become bold. */
 :root[data-theme='mono'] {
+  --rail: #9a9a9a;
+  --pill-shadow: 0 0 0 1px #000;
   --bg: #ffffff;
   --bg-elev: #ffffff;
   --fg: #000000;
@@ -98,6 +108,8 @@
 
 /* Teen: bright, warm and playful. */
 :root[data-theme='teen'] {
+  --rail: #ffb3d6;
+  --pill-shadow: 0 2px 10px rgba(255, 45, 138, 0.15);
   --bg: #fff3f9;
   --bg-elev: #ffffff;
   --fg: #2b1a3f;
@@ -114,6 +126,8 @@
 
 /* Gen Z: dark with neon lime and violet. */
 :root[data-theme='genz'] {
+  --rail: #3d3670;
+  --pill-shadow: 0 0 0 1px #2d2850;
   --bg: #0b0a14;
   --bg-elev: #17142a;
   --fg: #f2f0ff;
@@ -129,18 +143,46 @@
   color-scheme: dark;
 }
 
+/* Pastel: cream paper with lavender, mint and blush (soft and restful). */
+:root[data-theme='pastel'] {
+  --bg: #fbf8f1;
+  --bg-elev: #ffffff;
+  --fg: #33304a;
+  --fg-muted: #8a85a3;
+  --line: #ebe5f5;
+  --accent: #7b6cd9;
+  --accent-fg: #ffffff;
+  --accent-soft: #ece8ff;
+  --wj: #d9577a;
+  --mark: #fff0a3;
+  --heart: #f37fa0;
+  --rail: #cfc6ef;
+  --pill-shadow: 0 1px 2px rgba(123, 108, 217, 0.10), 0 3px 12px rgba(123, 108, 217, 0.10);
+  --shadow: 0 -8px 30px rgba(123, 108, 217, 0.16);
+}
+:root[data-theme='pastel'] body {
+  background:
+    radial-gradient(120% 60% at 0% 0%, #e7f7ef 0%, transparent 55%),
+    radial-gradient(120% 60% at 100% 100%, #fde7ef 0%, transparent 55%),
+    var(--bg);
+}
+:root[data-theme='pastel'] .bottom { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); }
+
 @media (prefers-color-scheme: dark) {
   :root[data-theme='system'] {
-    --bg: #15120f;
-    --bg-elev: #221d18;
-    --fg: #efe8df;
-    --fg-muted: #a8988a;
-    --line: #3a312a;
-    --accent: #d9b280;
-    --accent-fg: #1b130c;
-    --accent-soft: #33281e;
-    --wj: #f08a7e;
-    --mark: #8b7236;
+    --bg: #111113;
+    --bg-elev: #1c1c1f;
+    --fg: #f2f2f5;
+    --fg-muted: #98989f;
+    --line: #2c2c30;
+    --accent: #f2f2f5;
+    --accent-fg: #111113;
+    --accent-soft: #2a2a2e;
+    --wj: #ff8a80;
+    --mark: #6b5a1e;
+    --heart: #ff5a75;
+    --rail: #48484d;
+    --pill-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
   }
 }

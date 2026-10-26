@@ -1,4 +1,6 @@
 import type { Book, Manifest, OpenXref, Ref, StepWord, TranslationInfo, Verse } from './types';
+import { ESV_ID, ESV_INFO, esvManifest, loadEsvBook, searchEsv } from './esv';
+import { parseTypedRef } from './refs';
 
 // Layout under public/data/ (written by tools/build_data.py):
 //   translations.json        the list of translations shipped with the app
@@ -42,7 +44,8 @@ function cached<T>(cache: Map<string, Promise<T>>, key: string, path: string): P
 
 export function loadTranslations(): Promise<TranslationInfo[]> {
   if (!translationsPromise) {
-    translationsPromise = getJson<TranslationInfo[]>('translations.json').catch((e) => {
+    // The ESV is not bundled: it is listed here and read from Crossway's API (see esv.ts).
+    translationsPromise = getJson<TranslationInfo[]>('translations.json').then((list) => [...list, ESV_INFO]).catch((e) => {
       translationsPromise = null;
       throw e;
     });
@@ -51,11 +54,21 @@ export function loadTranslations(): Promise<TranslationInfo[]> {
 }
 
 export function loadManifest(translation: string): Promise<Manifest> {
+  if (translation === ESV_ID) return loadManifest(DEFAULT_TRANSLATION).then(esvManifest);
   return cached(manifestCache, translation, `${translation}/manifest.json`);
 }
 
-export function loadBook(translation: string, code: string): Promise<Book> {
+/**
+ * A bundled translation loads the whole book. The ESV loads only chapter `ch`
+ * (the returned book is marked `partial`).
+ */
+export function loadBook(translation: string, code: string, ch = 1): Promise<Book> {
+  if (translation === ESV_ID) return loadEsvBook(code, ch);
   return cached(bookCache, `${translation}/${code}`, `${translation}/books/${code}.json`);
+}
+
+export function isOnline(translation: string): boolean {
+  return translation === ESV_ID;
 }
 
 export function loadOpenXrefs(code: string): Promise<Record<string, OpenXref[]>> {
@@ -74,7 +87,7 @@ export function findVerse(book: Book, ch: number, v: number): Verse | undefined 
 }
 
 export async function getVerse(translation: string, ref: Ref): Promise<Verse | undefined> {
-  const book = await loadBook(translation, ref.book);
+  const book = await loadBook(translation, ref.book, ref.ch);
   return findVerse(book, ref.ch, ref.v);
 }
 
@@ -99,6 +112,12 @@ export async function searchAll(
   signal?: { cancelled: boolean; skipped?: number },
 ): Promise<SearchHit[]> {
   const q = query.normalize('NFC');
+  if (translation === ESV_ID) {
+    const m = await loadManifest(ESV_ID);
+    const found = await searchEsv(q, (reference) => parseTypedRef(m.books, reference));
+    onProgress?.(books.length, books.length);
+    return found.slice(0, limit).map((h) => ({ ref: h.ref, id: String(h.ref.v), text: h.text }));
+  }
   const hits: SearchHit[] = [];
   let scanned = 0;
   for (const code of books) {
