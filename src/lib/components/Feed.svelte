@@ -161,6 +161,7 @@
           label={label(item.ch, item.verse)}
           {lang}
           {textLang}
+          draft={!!meta.draft}
           {redLetters}
           {showHeadings}
           bookmarked={isBookmarked(ref)}

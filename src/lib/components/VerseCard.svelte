@@ -10,6 +10,7 @@
     label,
     lang,
     textLang,
+    draft = false,
     redLetters,
     showHeadings,
     bookmarked,
@@ -26,6 +27,8 @@
     label: string;
     lang: Lang;
     textLang: string;
+    /** the book comes from an unreleased source (some ULT books) */
+    draft?: boolean;
     redLetters: boolean;
     showHeadings: boolean;
     bookmarked: boolean;
@@ -149,7 +152,7 @@
       {/if}
     </div>
 
-    <p class="ref">{label}</p>
+    <p class="ref">{label}{#if draft} <span class="draft">{t(lang, 'draft')}</span>{/if}</p>
   </div>
 
   {#key burst}
@@ -228,6 +231,7 @@
     letter-spacing: 0.02em;
     color: var(--fg-muted);
   }
+  .draft { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); vertical-align: middle; }
   .line { display: block; }
   .line.q2 { padding-left: 1.5em; }
   .line.q3 { padding-left: 3em; }
