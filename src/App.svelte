@@ -361,6 +361,48 @@
   {:else if !manifest || !book || !meta}
     <div class="center muted">{t(lang, 'loading')}</div>
   {:else}
+    <!-- The reader stays mounted behind the other tabs, so the Read tab comes back instantly at the same verse. -->
+    <div class="reader" class:off={view !== 'read'} inert={view !== 'read'}>
+        <Feed
+          {book}
+          {meta}
+          {books}
+          {target}
+          {lang}
+          textLang={manifest.lang}
+          redLetters={app.settings.redLetters}
+          showRef={app.settings.showRef}
+          showHeadings={app.settings.showHeadings}
+          isBookmarked={(r) => app.isBookmarked(r)}
+          isLiked={(r) => app.isLiked(r)}
+          hasNote={(r) => !!app.notes[`${r.book}.${r.ch}.${r.v}`]}
+          {onCurrent}
+          onNavigate={navigate}
+          onStep={step}
+          onWhatsApp={whatsapp}
+          onStudy={(r, v, section) => (study = { r, v, section })}
+          onBookmark={(r) => app.toggleBookmark(r)}
+          onLike={(r) => app.toggleLike(r)}
+          onNote={(r, v) => (study = { r, v, section: 'notes' })}
+          onShare={(r, v) => share(r, v)}
+          onExplain={(r, v, focus) => (study = { r, v, section: 'explain', focus })}
+          onTv={openTvSheet}
+        />
+        <header class="top">
+          <div class="pills">
+            <button class="pill nav" onclick={() => step(-1)} aria-label={t(lang, 'prevChapter')} title={t(lang, 'prevChapter')}><Icon name="chevron-left" size={18} /></button>
+            <button class="pill tr" onclick={() => (trSheet = true)} aria-haspopup="dialog" aria-label={t(lang, 'translation')} title={t(lang, 'translation')} lang={manifest.lang}>{pillLabel}<Icon name="chevron-down" size={14} /></button>
+          </div>
+          <div class="pills">
+            <button class="pill title" onclick={() => (picker = true)} aria-label={currentLabel}>
+              <span>{chapterLabel} <span class="ch">{current.ch}</span></span>
+              <Icon name="chevron-down" size={16} />
+            </button>
+            <button class="pill nav" onclick={() => step(1)} aria-label={t(lang, 'nextChapter')} title={t(lang, 'nextChapter')}><Icon name="chevron-right" size={18} /></button>
+          </div>
+        </header>
+    </div>
+
     {#if view === 'tv'}
       <TvMode
         {book}
@@ -379,52 +421,13 @@
         {onRemote}
         onExit={exitTv}
       />
-    {:else if view === 'read'}
-      <Feed
-        {book}
-        {meta}
-        {books}
-        {target}
-        {lang}
-        textLang={manifest.lang}
-        redLetters={app.settings.redLetters}
-        showRef={app.settings.showRef}
-        showHeadings={app.settings.showHeadings}
-        isBookmarked={(r) => app.isBookmarked(r)}
-        isLiked={(r) => app.isLiked(r)}
-        hasNote={(r) => !!app.notes[`${r.book}.${r.ch}.${r.v}`]}
-        {onCurrent}
-        onNavigate={navigate}
-        onStep={step}
-        onWhatsApp={whatsapp}
-        onStudy={(r, v, section) => (study = { r, v, section })}
-        onBookmark={(r) => app.toggleBookmark(r)}
-        onLike={(r) => app.toggleLike(r)}
-        onNote={(r, v) => (study = { r, v, section: 'notes' })}
-        onShare={(r, v) => share(r, v)}
-        onExplain={(r, v, focus) => (study = { r, v, section: 'explain', focus })}
-        onTv={openTvSheet}
-      />
-      <header class="top">
-        <div class="pills">
-          <button class="pill nav" onclick={() => step(-1)} aria-label={t(lang, 'prevChapter')} title={t(lang, 'prevChapter')}><Icon name="chevron-left" size={18} /></button>
-          <button class="pill tr" onclick={() => (trSheet = true)} aria-haspopup="dialog" aria-label={t(lang, 'translation')} title={t(lang, 'translation')} lang={manifest.lang}>{pillLabel}<Icon name="chevron-down" size={14} /></button>
-        </div>
-        <div class="pills">
-          <button class="pill title" onclick={() => (picker = true)} aria-label={currentLabel}>
-            <span>{chapterLabel} <span class="ch">{current.ch}</span></span>
-            <Icon name="chevron-down" size={16} />
-          </button>
-          <button class="pill nav" onclick={() => step(1)} aria-label={t(lang, 'nextChapter')} title={t(lang, 'nextChapter')}><Icon name="chevron-right" size={18} /></button>
-        </div>
-      </header>
     {:else if view === 'plan'}
       <PlanView {books} {lang} onNavigate={navigate} />
     {:else if view === 'saved'}
       <SavedView {books} {lang} {translation} onNavigate={navigate} onEditNote={editNote} />
     {:else if view === 'search'}
       <SearchView {books} {lang} {translation} index={bookIndex} onNavigate={navigate} />
-    {:else}
+    {:else if view === 'settings'}
       <SettingsView {lang} {offlineReady} {translations} {manifest} onTvSheet={openTvSheet} />
     {/if}
 
@@ -495,6 +498,8 @@
 
 <style>
   .shell { position: relative; height: 100%; overflow: hidden; }
+  .reader { position: absolute; inset: 0; }
+  .reader.off { visibility: hidden; pointer-events: none; }
   .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
   .top {
     position: absolute;

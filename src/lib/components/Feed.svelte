@@ -75,10 +75,16 @@
   const prevBook = $derived(bookIndex > 0 ? books[bookIndex - 1] : null);
   const nextBook = $derived(bookIndex >= 0 && bookIndex + 1 < books.length ? books[bookIndex + 1] : null);
 
+  // Every verse has a card for scrolling and snapping, but only the cards
+  // near the one on screen are filled in: a long book (Psalms has 2,461
+  // verses) used to build thousands of full cards and took many seconds.
+  // All cards are exactly one screen tall, so the current card is simply
+  // scrollTop / height.
+  const NEAR = 3;
   let container: HTMLDivElement;
-  let io: IntersectionObserver | null = null;
-  const pending: HTMLElement[] = [];
+  let at = $state(0);
   let lastKey = '';
+  let raf = 0;
 
   function keyFor(r: Ref): string {
     const ch = book.chapters.find((c) => c.n === r.ch);
@@ -86,32 +92,23 @@
     return v ? `${r.ch}:${v.n}` : `${r.ch}:1`;
   }
 
-  onMount(() => {
-    io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const el = e.target as HTMLElement;
-          const key = el.dataset.key ?? '';
-          if (key === lastKey) continue;
-          const m = /^(\d+):(\d+)$/.exec(key);
-          if (!m) continue;
-          lastKey = key;
-          onCurrent({ book: book.code, ch: Number(m[1]), v: Number(m[2]) });
-        }
-      },
-      { root: container, threshold: 0.6 },
-    );
-    for (const el of pending) io.observe(el);
-    pending.length = 0;
-    return () => io?.disconnect();
-  });
-
-  function observe(node: HTMLElement) {
-    if (io) io.observe(node);
-    else pending.push(node);
-    return { destroy() { io?.unobserve(node); } };
+  function measure() {
+    raf = 0;
+    const h = container?.clientHeight;
+    if (!h) return;
+    const i = Math.max(0, Math.min(items.length - 1, Math.round(container.scrollTop / h)));
+    if (i !== at) at = i;
+    const item = items[i];
+    if (item?.kind !== 'verse' || item.key === lastKey) return;
+    lastKey = item.key;
+    onCurrent({ book: book.code, ch: item.ch, v: item.verse.n });
   }
+  function onScroll() {
+    if (!raf) raf = requestAnimationFrame(measure);
+  }
+  onMount(() => () => {
+    if (raf) cancelAnimationFrame(raf);
+  });
 
   // Scroll to the requested verse whenever the target or the book changes.
   $effect(() => {
@@ -119,13 +116,14 @@
     const code = book.code;
     if (!tgt || tgt.book !== code) return;
     const key = keyFor(tgt);
+    const i = items.findIndex((x) => x.key === key);
+    if (i < 0) return;
+    at = i; // fill the cards around the target before jumping there
     tick().then(() => {
-      const el = container?.querySelector<HTMLElement>(`[data-key="${key}"]`);
-      if (el) {
-        lastKey = key;
-        el.scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
-        onCurrent({ book: code, ch: tgt.ch, v: tgt.v });
-      }
+      if (!container) return;
+      lastKey = key;
+      container.scrollTop = i * container.clientHeight;
+      onCurrent({ book: code, ch: tgt.ch, v: tgt.v });
     });
   });
 
@@ -135,8 +133,8 @@
   }
 </script>
 
-<div class="feed" bind:this={container} use:swipe={{ onSwipe: (d) => onStep(d === 'right' ? 1 : -1) }} use:twoFingerTap={{ onTap: onWhatsApp }}>
-  {#each items as item (item.key)}
+<div class="feed" bind:this={container} onscroll={onScroll} use:swipe={{ onSwipe: (d) => onStep(d === 'right' ? 1 : -1) }} use:twoFingerTap={{ onTap: onWhatsApp }}>
+  {#each items as item, i (item.key)}
     {#if item.kind === 'intro'}
       <article class="card intro" data-key="intro">
         <div class="label"><span class="ref">{meta.long || meta.name}</span></div>
@@ -158,7 +156,8 @@
       </article>
     {:else if item.kind === 'verse'}
       {@const ref = { book: book.code, ch: item.ch, v: item.verse.n }}
-      <article class="card" data-key={item.key} use:observe>
+      <article class="card" data-key={item.key}>
+        {#if Math.abs(i - at) <= NEAR}
         <VerseCard
           verse={item.verse}
           label={label(item.ch, item.verse)}
@@ -178,6 +177,7 @@
           onExplain={(sel) => onExplain(ref, item.verse, sel)}
           {onTv}
         />
+        {/if}
       </article>
     {:else}
       <article class="card end" data-key="end">
@@ -222,7 +222,8 @@
   }
   .card {
     position: relative;
-    height: 100dvh;
+    /* exactly one screen of the feed, so the current card is scrollTop / height */
+    height: 100%;
     scroll-snap-align: start;
     scroll-snap-stop: always;
     display: flex;
@@ -230,6 +231,7 @@
     padding: calc(var(--top-h) + var(--safe-top) + 10px) 20px calc(var(--nav-h) + var(--safe-bottom) + 10px);
     content-visibility: auto;
     contain-intrinsic-size: auto 100dvh;
+    contain: strict;
     touch-action: pan-y;
   }
   .label { color: var(--fg-muted); font-size: 14px; margin-bottom: 10px; }
