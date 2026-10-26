@@ -24,6 +24,18 @@ Every further translation added to `public/data/` must record its own licence
 in its manifest (the `--licence` and `--licence-url` flags of
 `tools/build_data.py`) and be listed in this file.
 
+## Scripture text: Indian Revised Version (IRV) Hindi, Malayalam, Punjabi
+
+Source: 66 USFM/SFM files per language produced by Bridge Connectivity
+Solutions (the files' own \rem line: "Creative Commons Attribution-ShareAlike
+4.0 License"). SHA-256 of each input file is recorded in
+`public/data/hi-irv/`, `ml-irv/` and `pa-irv/manifest.json`.
+
+Licence: CC BY-SA 4.0. Attribution: "Indian Revised Version (IRV) Hindi /
+Malayalam / Punjabi, Bridge Connectivity Solutions, CC BY-SA 4.0." The derived
+JSON is the same text, restructured (look-only italics dropped, nested
+words-of-Jesus markers kept as offsets), under the same licence.
+
 ## Scripture text: Literal Text (ULT)
 
 Source: the *unfoldingWord® Literal Text*, Copyright © 2026 by unfoldingWord,

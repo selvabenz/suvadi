@@ -169,3 +169,28 @@ class StepTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OtherIrvMarkers(unittest.TestCase):
+    """Markers met in the Hindi, Malayalam and Punjabi IRV."""
+
+    def parse(self, body: str) -> dict:
+        return b.parse_book(b.normalize_usfm("\\id SNG\n\\rem Copyright\n\\h X\n\\c 1\n" + body), {})
+
+    def test_midline_verse_and_poetry_line(self):
+        book = self.parse("\\q \\v 1 one line \\q second line \\v 2 two")
+        vs = book["chapters"][0]["verses"]
+        self.assertEqual([v["text"] for v in vs], ["one line\nsecond line", "two"])
+
+    def test_look_only_styles_are_dropped(self):
+        book = self.parse("\\p \\v 1 a \\it word\\it* and \\bdit bold\\bdit* \\tl abba\\tl*.\\f + \\fr 1:1 \\ft see \\it this\\it*\\f*")
+        v = book["chapters"][0]["verses"][0]
+        self.assertEqual(v["text"], "a word and bold abba.")
+        self.assertEqual(v["footnotes"][0]["text"], "see this")
+
+    def test_speaker_subheading_rem_mr_io_q4(self):
+        book = self.parse("\\mr Psalms 1-41\n\\sp Bride\n\\q4 \\v 1 deep line\n\\s2 Part two\n\\p \\v 2 more")
+        vs = book["chapters"][0]["verses"]
+        self.assertEqual(vs[0]["heading"], "Bride")
+        self.assertEqual(vs[0]["styles"], ["q3"])
+        self.assertEqual(vs[1]["heading"], "Part two")

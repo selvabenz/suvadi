@@ -77,15 +77,16 @@ OSIS_TO_CODE = {
 # ---------------------------------------------------------------------------
 
 # Paragraph-level markers the IRV files use, grouped by what the app does with them.
-INTRO_MARKERS = {"is", "ip", "iot", "io1"}
+INTRO_MARKERS = {"is", "ip", "iot", "io1", "io"}
 HEADER_MARKERS = {"id", "ide", "h", "toc1", "toc2", "toc3", "mt", "mt1", "usfm"}
 # \qa is the acrostic letter of Psalm 119 (shown as a heading); \ms1 / \cl
 # ("Book One", "Psalm") repeat what the chapter number already says: dropped.
-HEADING_MARKERS = {"s", "s1", "r", "ms", "ms1", "d", "qa"}
-IGNORED_MARKERS = {"cl"}
-TEXT_PARA_MARKERS = {"p", "m", "pi", "b", "nb", "q", "q1", "q2", "q3", "qr", "pm", "pmo", "pmc", "pi1"}
+# \s2 is a sub-heading and \sp a speaker (Song of Songs); both show as headings.
+HEADING_MARKERS = {"s", "s1", "s2", "sp", "r", "ms", "ms1", "mr", "d", "qa"}
+IGNORED_MARKERS = {"cl", "rem"}
+TEXT_PARA_MARKERS = {"p", "m", "pi", "b", "nb", "q", "q1", "q2", "q3", "q4", "qr", "pm", "pmo", "pmc", "pi1"}
 # How less common paragraph markers are styled: embedded openings/closings are prose.
-PARA_STYLE = {"q1": "q", "pm": "m", "pmo": "m", "pmc": "m", "pi1": "pi"}
+PARA_STYLE = {"q1": "q", "q4": "q3", "pm": "m", "pmo": "m", "pmc": "m", "pi1": "pi"}
 VERSE_MARKER = "v"
 CHAPTER_MARKER = "c"
 KNOWN_PARA = INTRO_MARKERS | HEADER_MARKERS | HEADING_MARKERS | TEXT_PARA_MARKERS | IGNORED_MARKERS | {VERSE_MARKER, CHAPTER_MARKER}
@@ -107,7 +108,7 @@ _VERSE_RE = re.compile(r"^(\d+(?:-\d+)?[a-z]?)\s*(.*)$", re.S)
 _NOTE_RE = re.compile(r"\\(f|x)\s+(\S+)\s+(.*?)\\\1\*", re.S)
 _WJ_RE = re.compile(r"\\wj\s?(.*?)\\wj\*", re.S)
 _STRIP_RE = re.compile(r"\\(?:%s)\s?(.*?)\\(?:%s)\*" % ("|".join(STRIP_INLINE), "|".join(STRIP_INLINE)), re.S)
-_ANY_MARKER_RE = re.compile(r"\\[a-z0-9]+\*?")
+_ANY_MARKER_RE = re.compile(r"\\\+?[a-z0-9]+\*?")
 _SPACE_RE = re.compile(r"[ \t]+")
 
 
@@ -524,6 +525,24 @@ def build_alignment(book: dict, table: dict) -> tuple[dict, int]:
     return out, bad
 
 
+# Character styles that only change the look (italic, bold italic,
+# transliterated words): the text is kept, the markers are dropped.
+_LOOK_ONLY_RE = re.compile(r"\\(?:it|bdit|bd|em|tl|sc)\*|\\(?:it|bdit|bd|em|tl|sc)\s")
+# A verse or a poetry line that starts in the middle of a line (Punjabi IRV
+# has "… text \v 5 more text" and "… \q next line").
+_MIDLINE_V_RE = re.compile(r"[ \t]+(\\v\s)")
+_MIDLINE_Q_RE = re.compile(r"(?<=\S)[ \t]+(\\q\d?\s)")
+
+
+def normalize_usfm(text: str) -> str:
+    """Put every \\v and \\q at the start of a line and drop look-only character styles."""
+    text = re.sub(r"\\\+([a-z0-9]+\*?)", r"\\\1", text)  # nested markers (\+wj …\+wj*) read as plain ones
+    text = _LOOK_ONLY_RE.sub("", text)
+    text = re.sub(r"(?m)^[ \t]+(?=\\)", "", text)  # indented marker lines
+    text = _MIDLINE_V_RE.sub(lambda m: "\n" + m.group(1), text)
+    return _MIDLINE_Q_RE.sub(lambda m: "\n" + m.group(1), text)
+
+
 def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
     """Parse one USFM book into the app's book shape."""
     lines = text.splitlines()
@@ -604,11 +623,12 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
             pending_heading = {}
             current_style = "p"
         elif marker in HEADING_MARKERS:
-            if marker in ("ms", "ms1"):
+            if marker in ("ms", "ms1", "mr"):
                 continue  # "அத்தியாயம் N" / "சங்கீதம் N" / "Book One": the chapter number already says this
-            if verse is not None and marker in ("s", "s1", "r", "qa"):
+            if verse is not None and marker in ("s", "s1", "s2", "sp", "r", "qa"):
                 close_verse()
-            key = {"s": "heading", "s1": "heading", "qa": "heading", "r": "parallel", "d": "superscription"}[marker]
+            key = {"s": "heading", "s1": "heading", "s2": "heading", "sp": "heading", "qa": "heading",
+                   "r": "parallel", "d": "superscription"}[marker]
             if marker == "d":
                 sup = extract_inline(rest, book["code"], abbr_map)
                 target = verse if verse is not None else pending_heading
@@ -993,7 +1013,7 @@ def main(argv=None) -> int:
             for ch, data in book_align.items():
                 dump(tdir / "align" / code / f"{ch}.json", data)
         else:
-            book = parse_book(texts[code], abbr_map)
+            book = parse_book(normalize_usfm(texts[code]), abbr_map)
             for ch in book["chapters"]:
                 for v in ch["verses"]:
                     for k in ("_words", "_sup_words", "_sup_inline"):
