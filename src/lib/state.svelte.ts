@@ -26,6 +26,8 @@ export interface Settings {
   lineHeight: number;     // line spacing of the verse text, 1.3 .. 2.0
   aiEndpoint: string;     // optional AI service for Explain (a future BT Servant proxy)
   aiKey: string;
+  tvAutoAdvance: number;  // TV mode: seconds per verse, 0 = off
+  tvTheme: 'dark' | 'light';
 }
 
 export interface Bookmark { at: string }
@@ -45,7 +47,7 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showRef: true, showHeadings: false, textAlign: 'center', font: 'meera', esvKey: '', lineHeight: 1.45, aiEndpoint: '', aiKey: '' },
+  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showRef: true, showHeadings: false, textAlign: 'center', font: 'meera', esvKey: '', lineHeight: 1.45, aiEndpoint: '', aiKey: '', tvAutoAdvance: 0, tvTheme: 'dark' },
   place: { book: 'JHN', ch: 1, v: 1 },
   bookmarks: {},
   likes: {},
