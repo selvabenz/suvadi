@@ -100,3 +100,8 @@ All are in `public/fonts/` as woff2; Meera Inimai is the default.
   `fonts-lohit-taml` package, converted whole to woff2.
 - **Tiro Tamil**: Copyright 2020 Tiro Typeworks (https://tiro.com). Tamil and
   Latin woff2 subsets from Google Fonts.
+
+## Software library: qrcode-generator
+
+The QR code in "Show on a TV" is drawn with `qrcode-generator` by Kazuhiko
+Arase (https://github.com/kazuhikoarase/qrcode-generator), MIT License.
