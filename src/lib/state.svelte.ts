@@ -1,15 +1,20 @@
 import type { Lang, Ref, Theme } from './types';
 import { refKey } from './refs';
 import { localDateISO } from './plan';
+import { DEFAULT_TRANSLATION } from './data';
 
-// All reader state lives in localStorage under one key prefix. Nothing leaves
-// the device. Every read and write is wrapped: private windows and cleared
-// site data must never break the reader.
+// All reader state lives in localStorage under one key. Nothing leaves the
+// device. Every read and write is wrapped: private windows and cleared site
+// data must never break the reader.
 
-const KEY = 'tamil-irv-scroll:v1';
+const KEY = 'suvadi:v1';
+// The app was called "tamil-irv-scroll" before it became Suvadi; a reader who
+// installed it under that name keeps their place, bookmarks and notes.
+const LEGACY_KEYS = ['tamil-irv-scroll:v1'];
 
 export interface Settings {
   lang: Lang;
+  translation: string;  // id from data/translations.json
   theme: Theme;
   fontScale: number;   // 0.8 .. 1.6
   redLetters: boolean;
@@ -31,7 +36,7 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { lang: 'ta', theme: 'system', fontScale: 1, redLetters: true, showNumbers: true },
+  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true },
   place: { book: 'JHN', ch: 1, v: 1 },
   bookmarks: {},
   notes: {},
@@ -42,7 +47,17 @@ const DEFAULTS: Persisted = {
 
 function load(): Persisted {
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    if (!raw) {
+      for (const k of LEGACY_KEYS) {
+        raw = localStorage.getItem(k);
+        if (raw) {
+          localStorage.setItem(KEY, raw);
+          localStorage.removeItem(k);
+          break;
+        }
+      }
+    }
     if (!raw) return structuredClone(DEFAULTS);
     const parsed = JSON.parse(raw) as Partial<Persisted>;
     return {

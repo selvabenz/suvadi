@@ -4,13 +4,14 @@
   import { formatRef, parseTypedRef } from '../refs';
   import { t } from '../i18n';
 
-  let { books, lang, onNavigate }: { books: BookMeta[]; lang: Lang; onNavigate: (r: Ref) => void } = $props();
+  let { books, lang, translation, onNavigate }: { books: BookMeta[]; lang: Lang; translation: string; onNavigate: (r: Ref) => void } = $props();
 
   let query = $state('');
   let hits = $state<SearchHit[] | null>(null);
   let busy = $state(false);
   let progress = $state(0);
-  let signal: { cancelled: boolean } | null = null;
+  let signal: { cancelled: boolean; skipped?: number } | null = null;
+  let skipped = $state(0);
 
   const typedRef = $derived(parseTypedRef(books, query));
   const tooShort = $derived(query.trim().length < 2);
@@ -19,14 +20,20 @@
     e?.preventDefault();
     if (tooShort) return;
     if (signal) signal.cancelled = true;
-    const s = { cancelled: false };
+    const s = { cancelled: false, skipped: 0 };
     signal = s;
     busy = true;
     progress = 0;
     hits = null;
+    skipped = 0;
     try {
-      const out = await searchAll(books.map((b) => b.code), query.trim(), (n) => (progress = n), 200, s);
-      if (!s.cancelled) hits = out;
+      const out = await searchAll(translation, books.map((b) => b.code), query.trim(), (n) => (progress = n), 200, s);
+      if (!s.cancelled) {
+        hits = out;
+        skipped = s.skipped;
+      }
+    } catch {
+      if (!s.cancelled) hits = [];
     } finally {
       if (!s.cancelled) busy = false;
     }
@@ -66,6 +73,7 @@
 
   {#if hits}
     <h3>{t(lang, 'results')}: {hits.length}{#if hits.length >= 200} · {t(lang, 'tooMany')}{/if}</h3>
+    {#if skipped}<p class="muted small">{t(lang, 'searchSkipped')}: {skipped}</p>{/if}
     {#if !hits.length}
       <p class="muted">{t(lang, 'noResults')}</p>
     {:else}

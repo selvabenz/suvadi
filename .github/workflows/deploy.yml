@@ -1,0 +1,76 @@
+# Check, test, build and publish Suvadi to GitHub Pages on every push to main.
+#
+# One-time repository setting: Settings → Pages → Build and deployment →
+# Source: "GitHub Actions". The site is then served at
+# https://<owner>.github.io/suvadi/ (BASE_PATH below must match the repo name).
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push cancels a queued (not running) one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: npm ci
+
+      - name: Parser unit tests
+        run: python -m unittest discover -s tools/tests -v
+
+      - name: svelte-check
+        run: npm run check
+
+      - name: Vitest
+        run: npm run test
+
+      - name: Build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: |
+          npm run build
+          # GitHub Pages must serve dist/ as-is: no Jekyll processing.
+          touch dist/.nojekyll
+          test -f dist/data/translations.json
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

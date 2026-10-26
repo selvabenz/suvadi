@@ -6,7 +6,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $svg = Join-Path $root 'public\icons\icon.svg'
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 if (-not (Test-Path $edge)) { $edge = 'C:\Program Files\Google\Chrome\Application\chrome.exe' }
-$profile = Join-Path $env:TEMP 'tamil-irv-icon-profile'
+$profile = Join-Path $env:TEMP 'suvadi-icon-profile'
 foreach ($size in 192, 512) {
   $out = Join-Path $root "public\icons\icon-$size.png"
   if (Test-Path $out) { Remove-Item $out -Force }

@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
-"""Build the app's data files from the Tamil IRV SFM books and two open datasets.
+"""Build Suvadi's data files from one translation's USFM books and two open datasets.
 
 Inputs (all read-only, never modified):
-  --irv     folder of 66 IRV Tamil USFM/SFM books (one file per book, \\id first)
-  --xrefs   OpenBible.info cross_references.txt (CC BY 4.0)
-  --step    STEPBible-Data "Translators Amalgamated OT+NT" folder (TAHOT + TAGNT, CC BY 4.0)
+  --usfm    folder of 66 USFM/SFM books (one file per book, \\id first); --irv is an alias
+  --xrefs   OpenBible.info cross_references.txt (CC BY 4.0), shared by every translation
+  --step    STEPBible-Data "Translators Amalgamated OT+NT" folder (TAHOT + TAGNT, CC BY 4.0), shared
+
+The translation is described on the command line: --id (folder name and the
+value stored in the reader's settings), --lang, --name, --name-en, --abbr,
+--publisher, --licence, --licence-url. The defaults describe the Tamil IRV.
 
 Outputs under --out (default public/data):
-  manifest.json           book list, Tamil names, chapter/verse counts, provenance
-  books/<CODE>.json       one file per book: intro, headings, verses, footnotes, IRV cross-refs
-  xrefs/<CODE>.json       OpenBible cross-references for every verse of that book
-  words/<CODE>/<ch>.json  STEP original-language words for one chapter (word, translit, gloss, Strong's, morph)
+  translations.json           the list of translations in the app (this one added or replaced)
+  <id>/manifest.json          book list, book names, chapter/verse counts, licence, provenance
+  <id>/books/<CODE>.json      one file per book: intro, headings, verses, footnotes, cross-refs
+  xrefs/<CODE>.json           OpenBible cross-references for every verse of that book (shared)
+  words/<CODE>/<ch>.json      STEP original-language words for one chapter (shared)
+
+Run it once per translation. --xrefs and --step only need to be given once: the
+shared files stay in place and later translations reuse them. Every translation
+is expected to follow the English (NRSV) versification the shared data uses;
+pass --no-study for one that does not, and the reader hides those sections.
 
 Standard library only. Every file is read and written as UTF-8 explicitly: the
 default Windows code page cannot represent Tamil, Hebrew or Greek.
 
 The parser here is deliberately small. It handles exactly the marker set found in
-the IRV Tamil files (see --inventory) and fails loudly on anything else, so a
-new marker in a future revision is a visible error, not silently dropped text.
+the IRV files (see --inventory) and fails loudly on anything else, so a new
+marker in a future revision is a visible error, not silently dropped text.
 """
 from __future__ import annotations
 
@@ -590,22 +600,72 @@ def inventory(irv_dir: Path) -> None:
     print("inline markers:", dict(inline.most_common()))
 
 
+def translation_info(args, verse_count: int) -> dict:
+    """The entry for translations.json; the manifest repeats it with the books added."""
+    info = {
+        "id": args.id,
+        "lang": args.lang,
+        "name": args.name,
+        "nameEn": args.name_en,
+        "abbr": args.abbr,
+        "verseCount": verse_count,
+    }
+    if args.script:
+        info["script"] = args.script
+    if args.dir != "ltr":
+        info["dir"] = args.dir
+    if args.publisher:
+        info["publisher"] = args.publisher
+    if args.licence:
+        info["licence"] = {"name": args.licence}
+        if args.licence_url:
+            info["licence"]["url"] = args.licence_url
+    return info
+
+
+def update_translations(out: Path, info: dict) -> list:
+    """Add or replace this translation in translations.json, keeping the others' order."""
+    path = out / "translations.json"
+    entries: list = []
+    if path.exists():
+        with path.open(encoding="utf-8") as fh:
+            entries = json.load(fh)
+    entries = [e for e in entries if e.get("id") != info["id"]] + [info]
+    dump(path, entries)
+    return entries
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--irv", type=Path, default=Path(r"D:\Claude Lab\IRV Tamil"))
+    ap.add_argument("--usfm", "--irv", dest="usfm", type=Path, default=Path(r"D:\Claude Lab\IRV Tamil"),
+                    help="folder of 66 USFM/SFM books")
     ap.add_argument("--xrefs", type=Path, default=None, help="OpenBible cross_references.txt")
     ap.add_argument("--step", type=Path, default=None, help="STEPBible 'Translators Amalgamated OT+NT' folder")
     ap.add_argument("--out", type=Path, default=Path(__file__).resolve().parents[1] / "public" / "data")
     ap.add_argument("--inventory", action="store_true", help="print the marker inventory and exit")
+
+    tr = ap.add_argument_group("translation")
+    tr.add_argument("--id", default="ta-irv", help="folder name under data/, e.g. ta-irv, hi-irv")
+    tr.add_argument("--lang", default="ta", help="BCP 47 tag of the Scripture text")
+    tr.add_argument("--script", default="Taml", help="ISO 15924 script code ('' to omit)")
+    tr.add_argument("--dir", default="ltr", choices=["ltr", "rtl"])
+    tr.add_argument("--name", default="தமிழ் IRV", help="name in its own language")
+    tr.add_argument("--name-en", default="Tamil IRV")
+    tr.add_argument("--abbr", default="IRV", help="short label after a shared verse")
+    tr.add_argument("--publisher", default="Bridge Connectivity Solutions")
+    tr.add_argument("--licence", default="CC BY-SA 4.0")
+    tr.add_argument("--licence-url", default="https://creativecommons.org/licenses/by-sa/4.0/")
+    tr.add_argument("--no-study", action="store_true",
+                    help="this text does not follow English versification: hide the shared xrefs/words")
     args = ap.parse_args(argv)
 
     if args.inventory:
-        inventory(args.irv)
+        inventory(args.usfm)
         return 0
 
-    files = sorted(args.irv.glob("*.SFM")) + sorted(args.irv.glob("*.usfm"))
+    files = sorted(args.usfm.glob("*.SFM")) + sorted(args.usfm.glob("*.usfm"))
     if len(files) != 66:
-        print(f"expected 66 books in {args.irv}, found {len(files)}", file=sys.stderr)
+        print(f"expected 66 books in {args.usfm}, found {len(files)}", file=sys.stderr)
         return 2
 
     # Pass 1: book names, so cross-reference abbreviations can be resolved.
@@ -621,13 +681,15 @@ def main(argv=None) -> int:
                 abbr_map.setdefault(mm.group(1).strip().replace(" ", ""), code)
     missing = [c for c in CANON if c not in texts]
     if missing:
-        print(f"books missing from {args.irv}: {missing}", file=sys.stderr)
+        print(f"books missing from {args.usfm}: {missing}", file=sys.stderr)
         return 2
 
     # Pass 2: parse.
     out = args.out
+    tdir = out / args.id
     books_meta = []
     total_verses = 0
+    sample = ""
     unresolved = collections.Counter()
     for code in CANON:
         book = parse_book(texts[code], abbr_map)
@@ -636,6 +698,8 @@ def main(argv=None) -> int:
         chapters = [len(ch["verses"]) for ch in book["chapters"]]
         last_verse = [max((v.get("end", v["n"]) for v in ch["verses"]), default=0) for ch in book["chapters"]]
         total_verses += sum(chapters)
+        if code == "GEN" and book["chapters"] and book["chapters"][0]["verses"]:
+            sample = book["chapters"][0]["verses"][0]["text"].replace("\n", " ")
         for ch in book["chapters"]:
             for v in ch["verses"]:
                 for x in v.get("xrefs", []):
@@ -653,7 +717,7 @@ def main(argv=None) -> int:
             "chapters": chapters,
             "lastVerse": last_verse,
         })
-        dump(out / "books" / f"{code}.json", {
+        dump(tdir / "books" / f"{code}.json", {
             "code": code,
             "names": names,
             "intro": book["intro"],
@@ -663,20 +727,21 @@ def main(argv=None) -> int:
     if unresolved:
         print(f"  unresolved cross-reference book abbreviations: {dict(unresolved.most_common(20))}", file=sys.stderr)
 
+    info = translation_info(args, total_verses)
     manifest = {
-        "version": 1,
-        "title": {"ta": "தமிழ் IRV", "en": "Tamil IRV"},
+        "version": 2,
+        **info,
         "books": books_meta,
-        "verseCount": total_verses,
+        "sample": sample,
         "source": {
-            "irv": {
-                "name": "Indian Revised Version (IRV) Tamil",
+            "text": {
+                "name": args.name_en,
                 "files": [{"name": f.name, "sha256": sha256_of(f)} for f in files],
             }
         },
     }
 
-    # OpenBible cross-references
+    # OpenBible cross-references (shared between translations)
     if args.xrefs and args.xrefs.exists():
         print("cross-references:", file=sys.stderr)
         xrefs = build_xrefs(args.xrefs)
@@ -693,7 +758,7 @@ def main(argv=None) -> int:
     else:
         print("  (no --xrefs given: skipping OpenBible cross-references)", file=sys.stderr)
 
-    # STEP Bible words
+    # STEP Bible words (shared between translations)
     if args.step and args.step.exists():
         print("STEP Bible words:", file=sys.stderr)
         words = build_words(args.step)
@@ -712,8 +777,16 @@ def main(argv=None) -> int:
     else:
         print("  (no --step given: skipping STEP Bible words)", file=sys.stderr)
 
-    dump(out / "manifest.json", manifest)
-    print(f"wrote {out} — {len(books_meta)} books, {total_verses} verses", file=sys.stderr)
+    # Which shared study data this translation can use.
+    has_xrefs = (out / "xrefs").is_dir() and any((out / "xrefs").glob("*.json"))
+    has_words = (out / "words").is_dir() and any((out / "words").glob("*/*.json"))
+    manifest["study"] = {"xrefs": has_xrefs and not args.no_study, "words": has_words and not args.no_study}
+    info["study"] = manifest["study"]
+
+    dump(tdir / "manifest.json", manifest)
+    entries = update_translations(out, info)
+    print(f"wrote {tdir} — {len(books_meta)} books, {total_verses} verses; "
+          f"translations.json now lists {[e['id'] for e in entries]}", file=sys.stderr)
     return 0
 
 

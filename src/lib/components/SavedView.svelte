@@ -8,9 +8,10 @@
   let {
     books,
     lang,
+    translation,
     onNavigate,
     onEditNote,
-  }: { books: BookMeta[]; lang: Lang; onNavigate: (r: Ref) => void; onEditNote: (r: Ref) => void } = $props();
+  }: { books: BookMeta[]; lang: Lang; translation: string; onNavigate: (r: Ref) => void; onEditNote: (r: Ref) => void } = $props();
 
   const bookmarks = $derived(
     Object.keys(app.bookmarks)
@@ -39,7 +40,7 @@
         <li>
           <button class="row" onclick={() => onNavigate(r)}>
             <span class="rref">{formatRef(books, r)}</span>
-            <VersePreview {r} />
+            <VersePreview {r} {translation} />
           </button>
           <button class="del" onclick={() => app.toggleBookmark(r)} aria-label={t(lang, 'delete')}>✕</button>
         </li>
@@ -57,7 +58,7 @@
           <button class="row" onclick={() => onNavigate(r)}>
             <span class="rref">{formatRef(books, r)}</span>
             <span class="ntext">{n.text}</span>
-            <VersePreview {r} max={100} />
+            <VersePreview {r} {translation} max={100} />
           </button>
           <button class="del" onclick={() => onEditNote(r)} aria-label={t(lang, 'note')}>✎</button>
         </li>

@@ -2,16 +2,17 @@
   import type { Ref } from '../types';
   import { getVerse } from '../data';
 
-  let { r, max = 160 }: { r: Ref; max?: number } = $props();
+  let { r, translation, max = 160 }: { r: Ref; translation: string; max?: number } = $props();
 
   let text = $state<string | null>(null);
   let failed = $state(false);
 
   $effect(() => {
     const ref = r;
+    const id = translation;
     text = null;
     failed = false;
-    getVerse(ref)
+    getVerse(id, ref)
       .then((v) => {
         const s = v?.text.replace(/\n/g, ' ') ?? '';
         text = s.length > max ? s.slice(0, max).trimEnd() + '…' : s;

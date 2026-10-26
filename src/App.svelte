@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Book, Manifest, Ref, Verse } from './lib/types';
-  import { loadBook, loadManifest } from './lib/data';
+  import type { Book, Manifest, Ref, TranslationInfo, Verse } from './lib/types';
+  import { DEFAULT_TRANSLATION, loadBook, loadManifest, loadTranslations } from './lib/data';
   import { formatRef, nextChapter, prevChapter } from './lib/refs';
   import { t } from './lib/i18n';
   import { app } from './lib/state.svelte';
@@ -16,6 +16,7 @@
 
   type View = 'read' | 'plan' | 'saved' | 'search' | 'settings';
 
+  let translations = $state<TranslationInfo[]>([]);
   let manifest = $state<Manifest | null>(null);
   let loadError = $state(false);
   let view = $state<View>('read');
@@ -27,8 +28,10 @@
   let noteFor = $state<Ref | null>(null);
   let toast = $state('');
   let offlineReady = $state(false);
+  let loadedFor = DEFAULT_TRANSLATION;   // the translation `manifest` was loaded for
 
   const lang = $derived(app.settings.lang);
+  const translation = $derived(app.settings.translation);
   const books = $derived(manifest?.books ?? []);
   const meta = $derived(book ? books.find((b) => b.code === book!.code) ?? null : null);
   const currentLabel = $derived(books.length ? formatRef(books, current) : '');
@@ -39,29 +42,64 @@
     document.documentElement.lang = lang;
   });
 
-  onMount(async () => {
+  async function start() {
+    loadError = false;
     try {
-      manifest = await loadManifest();
+      translations = await loadTranslations();
+      // A translation that was removed from the build falls back to the default.
+      if (!translations.some((x) => x.id === translation) && translations.length) {
+        app.update('translation', translations.some((x) => x.id === DEFAULT_TRANSLATION) ? DEFAULT_TRANSLATION : translations[0].id);
+      }
+      loadedFor = app.settings.translation;
+      manifest = await loadManifest(loadedFor);
       await navigate(app.place, false);
     } catch {
       loadError = true;
     }
+  }
+
+  onMount(async () => {
+    await start();
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then(() => (offlineReady = true)).catch(() => {});
     }
   });
 
-  async function navigate(ref: Ref, record = true) {
-    view = 'read';
+  // Switching translation in Settings: reload the manifest and the open book,
+  // and stay on the same verse (verse references are shared across translations).
+  $effect(() => {
+    const id = translation;
+    if (!manifest || id === loadedFor) return;
+    loadedFor = id;
+    const place = current;
+    loadManifest(id)
+      .then(async (m) => {
+        manifest = m;
+        book = null;
+        // Reopen the same verse in the new translation without leaving the
+        // current tab (the reader is on Settings when this happens).
+        await open(place);
+      })
+      .catch(() => showToast(t(lang, 'loadFailed')));
+  });
+
+  /** Load the book for `ref` (in the chosen translation) and point the feed at it. */
+  async function open(ref: Ref): Promise<boolean> {
     if (!book || book.code !== ref.book) {
       try {
-        book = await loadBook(ref.book);
+        book = await loadBook(app.settings.translation, ref.book);
       } catch {
         showToast(t(lang, 'loadFailed'));
-        return;
+        return false;
       }
     }
     target = { ...ref };
+    return true;
+  }
+
+  async function navigate(ref: Ref, record = true) {
+    view = 'read';
+    if (!(await open(ref))) return;
     if (record) app.pushHistory(ref);
   }
 
@@ -86,7 +124,7 @@
 
   async function share(r: Ref, v: Verse) {
     const label = formatRef(books, { book: r.book, ch: r.ch, v: v.n }, v.end);
-    const text = `${v.text}\n— ${label} (IRV)`;
+    const text = `${v.text}\n— ${label} (${manifest?.abbr ?? ''})`.replace(' ()', '');
     try {
       if (navigator.share) {
         await navigator.share({ text });
@@ -105,13 +143,7 @@
   }
 
   function retry() {
-    loadError = false;
-    loadManifest()
-      .then(async (m) => {
-        manifest = m;
-        await navigate(app.place, false);
-      })
-      .catch(() => (loadError = true));
+    start();
   }
 </script>
 
@@ -150,11 +182,11 @@
     {:else if view === 'plan'}
       <PlanView {books} {lang} onNavigate={navigate} />
     {:else if view === 'saved'}
-      <SavedView {books} {lang} onNavigate={navigate} onEditNote={(r) => (noteFor = r)} />
+      <SavedView {books} {lang} {translation} onNavigate={navigate} onEditNote={(r) => (noteFor = r)} />
     {:else if view === 'search'}
-      <SearchView {books} {lang} onNavigate={navigate} />
+      <SearchView {books} {lang} {translation} onNavigate={navigate} />
     {:else}
-      <SettingsView {lang} {offlineReady} />
+      <SettingsView {lang} {offlineReady} {translations} {manifest} />
     {/if}
 
     <nav class="bottom" aria-label="main">
@@ -174,6 +206,8 @@
         verse={study.v}
         {books}
         {lang}
+        {translation}
+        study={manifest.study}
         section={study.section}
         onNavigate={(r) => { study = null; navigate(r); }}
         onClose={() => (study = null)}

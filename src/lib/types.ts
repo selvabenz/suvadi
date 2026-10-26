@@ -11,11 +11,30 @@ export interface BookMeta {
   lastVerse: number[];  // highest verse number per chapter
 }
 
-export interface Manifest {
+/**
+ * One entry of data/translations.json: everything the app needs to list a
+ * translation before loading its manifest.
+ */
+export interface TranslationInfo {
+  id: string;          // folder under data/, e.g. "ta-irv"
+  lang: string;        // BCP 47 language tag of the Scripture text, e.g. "ta", "hi"
+  script?: string;     // ISO 15924, e.g. "Taml", "Deva"
+  dir?: 'ltr' | 'rtl';
+  name: string;        // name in its own language, e.g. "தமிழ் IRV"
+  nameEn: string;      // English name, e.g. "Tamil IRV"
+  abbr: string;        // short label used after a shared verse, e.g. "IRV"
+  publisher?: string;
+  licence?: { name: string; url?: string };
+  /** Which shared study datasets apply to this text (English versification). */
+  study?: { xrefs?: boolean; words?: boolean };
+  verseCount?: number;
+}
+
+export interface Manifest extends TranslationInfo {
   version: number;
-  title: { ta: string; en: string };
   books: BookMeta[];
   verseCount: number;
+  sample?: string;     // Genesis 1:1, shown as the text-size sample in Settings
   source: Record<string, unknown>;
 }
 

@@ -12,6 +12,8 @@
     verse,
     books,
     lang,
+    translation,
+    study,
     section,
     onNavigate,
     onClose,
@@ -20,6 +22,9 @@
     verse: Verse;
     books: BookMeta[];
     lang: Lang;
+    translation: string;
+    /** Which shared study datasets apply to this translation (from its manifest). */
+    study?: { xrefs?: boolean; words?: boolean };
     section?: 'footnotes' | 'xrefs';
     onNavigate: (r: Ref) => void;
     onClose: () => void;
@@ -28,6 +33,8 @@
   const meta = $derived(books.find((b) => b.code === r.book));
   const isOT = $derived(meta?.testament === 'ot');
   const title = $derived(`${formatRef(books, { book: r.book, ch: r.ch, v: verse.n }, verse.end)}`);
+  const showXrefs = $derived(study?.xrefs !== false);
+  const showWords = $derived(study?.words !== false);
 
   let open = $state<OpenXref[] | null>(null);
   let openFailed = $state(false);
@@ -39,6 +46,10 @@
     const ref = r;
     open = null;
     openFailed = false;
+    if (!showXrefs) {
+      open = [];
+      return;
+    }
     loadOpenXrefs(ref.book)
       .then((m) => (open = m[`${ref.ch}:${ref.v}`] ?? []))
       .catch(() => (openFailed = true));
@@ -48,6 +59,10 @@
     const ref = r;
     words = null;
     wordsFailed = false;
+    if (!showWords) {
+      words = [];
+      return;
+    }
     loadWords(ref.book, ref.ch)
       .then((m) => {
         // a verse bridge shows the words of every verse it spans
@@ -119,6 +134,7 @@
       </section>
     {/if}
 
+    {#if showXrefs}
     <section>
       <h3>{t(lang, 'openXrefs')}</h3>
       {#if open === null && !openFailed}
@@ -132,7 +148,7 @@
             <li>
               <button class="row" onclick={() => onNavigate(ref)}>
                 <span class="rref">{formatRef(books, ref, vEnd || undefined)}</span>
-                <VersePreview r={ref} />
+                <VersePreview r={ref} {translation} />
               </button>
             </li>
           {/each}
@@ -142,7 +158,9 @@
         <p class="muted small">—</p>
       {/if}
     </section>
+    {/if}
 
+    {#if showWords}
     <section>
       <h3>{t(lang, 'words')}</h3>
       {#if words === null && !wordsFailed}
@@ -173,6 +191,7 @@
         <p class="muted small">—</p>
       {/if}
     </section>
+    {/if}
 
     {#if !hasAnything}
       <p class="muted">{t(lang, 'nothingHere')}</p>

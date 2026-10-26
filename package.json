@@ -1,9 +1,15 @@
 {
-  "name": "tamil-irv-scroll",
+  "name": "suvadi",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Tamil IRV, one verse at a time: an offline-first scrolling Bible (PWA).",
+  "description": "Suvadi (சுவடி): the Bible in Indian languages, one verse at a time. An offline-first scrolling Bible reader (PWA).",
+  "license": "GPL-3.0-only",
+  "homepage": "https://selvabenz.github.io/suvadi/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/selvabenz/suvadi.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "data": "python tools/build_data.py",
-    "data:test": "python -m unittest discover -s tools/tests -v"
+    "data:test": "python -m unittest discover -s tools/tests -v",
+    "data:migrate": "python tools/migrate_data.py"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

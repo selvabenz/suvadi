@@ -3,7 +3,7 @@ import type { Lang } from './types';
 // Every string on screen, Tamil first. The English column is a fallback UI, not
 // a translation of Scripture. Tamil wording is for native review.
 const STRINGS = {
-  appName: { ta: 'தமிழ் IRV', en: 'Tamil IRV' },
+  appName: { ta: 'சுவடி', en: 'Suvadi' },
   tagline: { ta: 'வசனம் வசனமாக', en: 'One verse at a time' },
   loading: { ta: 'ஏற்றுகிறது…', en: 'Loading…' },
   loadFailed: { ta: 'வேத வசனங்களை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.', en: 'Could not load the Scripture text. Please try again.' },
@@ -100,8 +100,10 @@ const STRINGS = {
   noResults: { ta: 'எதுவும் கிடைக்கவில்லை', en: 'No results' },
   tooMany: { ta: 'முதல் 200 முடிவுகள் மட்டும்', en: 'Showing the first 200 results' },
   searchHint: { ta: 'குறைந்தது 2 எழுத்துகள் தட்டச்சு செய்யவும்', en: 'Type at least 2 characters' },
+  searchSkipped: { ta: 'ஏற்ற முடியாத புத்தகங்கள் (இணையம் இல்லை?)', en: 'Books that could not be loaded (offline?)' },
 
-  language: { ta: 'மொழி', en: 'Language' },
+  language: { ta: 'செயலி மொழி', en: 'App language' },
+  translation: { ta: 'வேதாகம மொழிபெயர்ப்பு', en: 'Bible translation' },
   theme: { ta: 'தோற்றம்', en: 'Theme' },
   themeLight: { ta: 'வெளிர்', en: 'Light' },
   themeDark: { ta: 'இருள்', en: 'Dark' },
@@ -116,11 +118,12 @@ const STRINGS = {
   offlineReady: { ta: 'இணையம் இல்லாமலும் வாசிக்கலாம்', en: 'Ready to read offline' },
   about: { ta: 'பற்றி', en: 'About' },
   aboutText: {
-    ta: 'தமிழ் IRV (Indian Revised Version) வேதாகமத்தை ஒரு நேரத்தில் ஒரு வசனமாக வாசிக்கும் செயலி. வேத வசனங்கள் முழுவதும் சாதனத்தில் சேமிக்கப்பட்டு இணையம் இல்லாமலும் செயல்படும். உங்கள் அடையாளங்கள், குறிப்புகள், வாசிப்பு இடம் ஆகியவை இந்தச் சாதனத்தை விட்டு வெளியே செல்வதில்லை.',
-    en: 'Reads the Tamil IRV (Indian Revised Version) Bible one verse at a time. The whole text is stored on the device and works offline. Bookmarks, notes and your reading position never leave this device.',
+    ta: 'சுவடி — இந்திய மொழிகளில் வேதாகமத்தை ஒரு நேரத்தில் ஒரு வசனமாக வாசிக்கும் செயலி. ஓலைச் சுவடியைப் போலவே, ஒவ்வொரு வசனமும் தனித் திரையில். வேத வசனங்கள் முழுவதும் சாதனத்தில் சேமிக்கப்பட்டு இணையம் இல்லாமலும் செயல்படும். உங்கள் அடையாளங்கள், குறிப்புகள், வாசிப்பு இடம் ஆகியவை இந்தச் சாதனத்தை விட்டு வெளியே செல்வதில்லை.',
+    en: 'Suvadi reads the Bible in Indian languages one verse at a time, like the palm-leaf manuscripts (suvadi) it is named after. The whole text is stored on the device and works offline. Bookmarks, notes and your reading position never leave this device.',
   },
   attributions: { ta: 'நன்றி மற்றும் உரிமங்கள்', en: 'Credits and licences' },
-  attrIrv: { ta: 'வேத வசனங்கள்: Indian Revised Version (IRV) தமிழ், Bridge Connectivity Solutions.', en: 'Scripture: Indian Revised Version (IRV) Tamil, Bridge Connectivity Solutions.' },
+  attrScripture: { ta: 'வேத வசனங்கள்', en: 'Scripture' },
+  attrCode: { ta: 'செயலியின் மூலக் குறியீடு: GPL-3.0,', en: 'App source code: GPL-3.0,' },
   attrOpenBible: { ta: 'தொடர்புடைய வசனங்கள்: OpenBible.info Cross References, CC BY 4.0.', en: 'Related verses: OpenBible.info Cross References, CC BY 4.0.' },
   attrStep: { ta: 'மூல மொழிச் சொற்கள்: STEP Bible TAHOT & TAGNT (Tyndale House, Cambridge), CC BY 4.0.', en: 'Original-language words: STEP Bible TAHOT & TAGNT (Tyndale House, Cambridge), CC BY 4.0.' },
   attrFont: { ta: 'எழுத்துரு: Noto Sans Tamil, SIL Open Font License.', en: 'Font: Noto Sans Tamil, SIL Open Font License.' },

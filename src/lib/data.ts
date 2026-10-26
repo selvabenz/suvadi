@@ -1,8 +1,22 @@
-import type { Book, Manifest, OpenXref, Ref, StepWord, Verse } from './types';
+import type { Book, Manifest, OpenXref, Ref, StepWord, TranslationInfo, Verse } from './types';
+
+// Layout under public/data/ (written by tools/build_data.py):
+//   translations.json        the list of translations shipped with the app
+//   <id>/manifest.json       one translation: books, names, counts, provenance
+//   <id>/books/<CODE>.json   that translation's text, one file per book
+//   xrefs/<CODE>.json        OpenBible cross-references (shared, English versification)
+//   words/<CODE>/<ch>.json   STEP original-language words (shared)
+//
+// Every loader takes the translation id explicitly, so the UI can show two
+// translations side by side later without touching this file.
 
 const BASE = `${import.meta.env.BASE_URL}data/`;
 
-let manifestPromise: Promise<Manifest> | null = null;
+/** The translation precached by the service worker and used before any choice is made. */
+export const DEFAULT_TRANSLATION = 'ta-irv';
+
+let translationsPromise: Promise<TranslationInfo[]> | null = null;
+const manifestCache = new Map<string, Promise<Manifest>>();
 const bookCache = new Map<string, Promise<Book>>();
 const xrefCache = new Map<string, Promise<Record<string, OpenXref[]>>>();
 const wordsCache = new Map<string, Promise<Record<string, StepWord[]>>>();
@@ -13,51 +27,43 @@ async function getJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function loadManifest(): Promise<Manifest> {
-  if (!manifestPromise) {
-    manifestPromise = getJson<Manifest>('manifest.json').catch((e) => {
-      manifestPromise = null;
-      throw e;
-    });
-  }
-  return manifestPromise;
-}
-
-export function loadBook(code: string): Promise<Book> {
-  let p = bookCache.get(code);
+/** Load once and keep; on failure forget the promise so a retry can succeed. */
+function cached<T>(cache: Map<string, Promise<T>>, key: string, path: string): Promise<T> {
+  let p = cache.get(key);
   if (!p) {
-    p = getJson<Book>(`books/${code}.json`).catch((e) => {
-      bookCache.delete(code);
+    p = getJson<T>(path).catch((e) => {
+      cache.delete(key);
       throw e;
     });
-    bookCache.set(code, p);
+    cache.set(key, p);
   }
   return p;
+}
+
+export function loadTranslations(): Promise<TranslationInfo[]> {
+  if (!translationsPromise) {
+    translationsPromise = getJson<TranslationInfo[]>('translations.json').catch((e) => {
+      translationsPromise = null;
+      throw e;
+    });
+  }
+  return translationsPromise;
+}
+
+export function loadManifest(translation: string): Promise<Manifest> {
+  return cached(manifestCache, translation, `${translation}/manifest.json`);
+}
+
+export function loadBook(translation: string, code: string): Promise<Book> {
+  return cached(bookCache, `${translation}/${code}`, `${translation}/books/${code}.json`);
 }
 
 export function loadOpenXrefs(code: string): Promise<Record<string, OpenXref[]>> {
-  let p = xrefCache.get(code);
-  if (!p) {
-    p = getJson<Record<string, OpenXref[]>>(`xrefs/${code}.json`).catch((e) => {
-      xrefCache.delete(code);
-      throw e;
-    });
-    xrefCache.set(code, p);
-  }
-  return p;
+  return cached(xrefCache, code, `xrefs/${code}.json`);
 }
 
 export function loadWords(code: string, ch: number): Promise<Record<string, StepWord[]>> {
-  const key = `${code}/${ch}`;
-  let p = wordsCache.get(key);
-  if (!p) {
-    p = getJson<Record<string, StepWord[]>>(`words/${code}/${ch}.json`).catch((e) => {
-      wordsCache.delete(key);
-      throw e;
-    });
-    wordsCache.set(key, p);
-  }
-  return p;
+  return cached(wordsCache, `${code}/${ch}`, `words/${code}/${ch}.json`);
 }
 
 /** Find the verse record that contains verse number v (bridges included). */
@@ -67,8 +73,8 @@ export function findVerse(book: Book, ch: number, v: number): Verse | undefined 
   return chapter.verses.find((x) => x.n === v) ?? chapter.verses.find((x) => x.n <= v && (x.end ?? x.n) >= v);
 }
 
-export async function getVerse(ref: Ref): Promise<Verse | undefined> {
-  const book = await loadBook(ref.book);
+export async function getVerse(translation: string, ref: Ref): Promise<Verse | undefined> {
+  const book = await loadBook(translation, ref.book);
   return findVerse(book, ref.ch, ref.v);
 }
 
@@ -81,21 +87,31 @@ export interface SearchHit {
 /**
  * Plain substring search across the whole Bible. Books are loaded as needed
  * (and precached by the service worker after first visit). `onProgress` is
- * called after each book with the count scanned so far.
+ * called after each book with the count scanned so far. A book that cannot be
+ * loaded (offline, not yet cached) is skipped and counted in `skipped`.
  */
 export async function searchAll(
+  translation: string,
   books: string[],
   query: string,
   onProgress?: (scanned: number, total: number) => void,
   limit = 200,
-  signal?: { cancelled: boolean },
+  signal?: { cancelled: boolean; skipped?: number },
 ): Promise<SearchHit[]> {
   const q = query.normalize('NFC');
   const hits: SearchHit[] = [];
   let scanned = 0;
   for (const code of books) {
     if (signal?.cancelled) break;
-    const book = await loadBook(code);
+    let book: Book;
+    try {
+      book = await loadBook(translation, code);
+    } catch {
+      if (signal) signal.skipped = (signal.skipped ?? 0) + 1;
+      scanned++;
+      onProgress?.(scanned, books.length);
+      continue;
+    }
     for (const ch of book.chapters) {
       for (const v of ch.verses) {
         if (v.text.includes(q)) {
