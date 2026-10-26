@@ -166,7 +166,9 @@ export async function loadEsvBook(code: string, ch: number): Promise<Book> {
 export function esvManifest(base: Manifest): Manifest {
   const books: BookMeta[] = base.books.map((b) => {
     const name = esvName(b.code);
-    return { ...b, name, long: name, abbr: name, header: name };
+    // a short abbreviation for the book pill, in the ULT's style (Gen, Jhn, 1Co)
+    const abbr = b.code[0] + b.code.slice(1).toLowerCase();
+    return { ...b, name, long: name, abbr, header: name };
   });
   return {
     ...ESV_INFO,

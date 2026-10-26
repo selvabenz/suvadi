@@ -195,13 +195,23 @@
     if (id !== translation) app.update('translation', id);
   }
   /** The pill's label: the abbreviation, or the full name when several share it (four "IRV"s). */
+  /**
+   * The Bible pill shows only the language ("தமிழ்", "हिन्दी"); when two
+   * translations share a language (ULT and ESV are both English) it shows the
+   * abbreviation instead.
+   */
   const pillLabel = $derived.by(() => {
     if (!manifest) return '';
-    const same = translations.filter((x) => x.abbr === manifest!.abbr).length > 1;
-    return same ? manifest.name : manifest.abbr;
+    const sameLang = translations.filter((x) => x.lang === manifest!.lang).length > 1;
+    const langName = manifest.name.replace(manifest.abbr, '').trim();
+    return sameLang || !langName ? manifest.abbr : langName;
   });
 
-  const chapterLabel = $derived(books.find((b) => b.code === current.book)?.name ?? '');
+  /** The book pill shows the book's abbreviation (\toc3) to save space; the full name is its label. */
+  const chapterLabel = $derived.by(() => {
+    const b = books.find((x) => x.code === current.book);
+    return b ? b.abbr || b.name : '';
+  });
 
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   function showToast(msg: string) {
@@ -512,8 +522,8 @@
     pointer-events: none;
   }
   .pills { display: flex; gap: 8px; pointer-events: auto; }
-  .pill.tr { font-weight: 700; letter-spacing: 0.02em; }
-  .pill.title { max-width: 52vw; }
+  .pill.tr { font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; gap: 4px; padding: 0 12px; }
+  .pill.title { max-width: 46vw; white-space: nowrap; }
   .pill.title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pill.title .ch { color: var(--fg-muted); }
   .bottom {
