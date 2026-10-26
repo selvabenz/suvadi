@@ -1,0 +1,30 @@
+{
+  "name": "tamil-irv-scroll",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tamil IRV, one verse at a time: an offline-first scrolling Bible (PWA).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "data": "python tools/build_data.py",
+    "data:test": "python -m unittest discover -s tools/tests -v"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^26.6.5",
+    "jsdom": "^26.1.0",
+    "playwright": "^1.64.1",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.7",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.5"
+  }
+}
