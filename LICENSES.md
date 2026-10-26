@@ -42,7 +42,21 @@ redistributing the raw files; this project ships a per-chapter subset
 Changes made: columns reduced to surface form, transliteration, gloss, Strong's,
 morphology and a variant flag; words only in "Other" Greek editions omitted.
 
-## Font: Noto Sans Tamil
+## Fonts (all SIL Open Font License 1.1)
 
-Google Noto fonts, SIL Open Font License 1.1. Two woff2 subsets (Tamil, Latin)
-in `public/fonts/`.
+The reader lets the user pick one of five Tamil typefaces (Settings > Font).
+All are in `public/fonts/` as woff2; Meera Inimai is the default.
+
+- **Meera Inimai**: Copyright 2012-2016 Hussain K.H, Santhosh Thottingal, Anilan
+  NG, AKM Kutty, Swathanthra Malayalam Computing (http://smc.org.in). Two woff2
+  subsets (Tamil, Latin) from Google Fonts.
+- **Mukta Malar**: Copyright 2016 Ek Type (http://ektype.in). Tamil and Latin
+  woff2 subsets from Google Fonts.
+- **Pavanam**: Copyright 2016 Tharique Azeez (http://tharique.github.io/pavanam).
+  Tamil and Latin woff2 subsets from Google Fonts.
+- **Lohit Tamil** 2.91.3: Copyright 2006 Modular Infotech Pvt Ltd, 2009 Red Hat,
+  Inc., 2011-2012 Lohit Fonts Project contributors (https://pagure.io/lohit).
+  "Lohit" is a trademark of Red Hat, Inc. The TTF from Debian's
+  `fonts-lohit-taml` package, converted whole to woff2.
+- **Tiro Tamil**: Copyright 2020 Tiro Typeworks (https://tiro.com). Tamil and
+  Latin woff2 subsets from Google Fonts.
