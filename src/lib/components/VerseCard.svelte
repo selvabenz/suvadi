@@ -2,6 +2,7 @@
   import type { Lang, Selection, StudySection, Verse } from '../types';
   import { layoutVerse, selectionText, splitWords } from '../layout';
   import { tap } from '../gestures';
+  import { fitWords } from '../fit';
   import { t } from '../i18n';
   import Icon from './Icon.svelte';
 
@@ -54,6 +55,14 @@
   function like() {
     if (!liked) burst++;
     onLike();
+  }
+  // Footnote / cross-reference markers are inline text (not buttons), so a
+  // marker never wraps onto a line by itself, away from its word.
+  function activate(e: KeyboardEvent, section: StudySection) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onStudy(section);
+    }
   }
   function longPress() {
     if (selecting) return;
@@ -117,7 +126,7 @@
       <p class="lead muted" lang={textLang}>{verse.lead}</p>
     {/if}
 
-    <div class="text" class:red={redLetters} class:selecting lang={textLang}>
+    <div class="text" class:red={redLetters} class:selecting lang={textLang} use:fitWords>
       {#if selecting}
         {#each wordLines as line, li}
           <span class="line {line.style}" class:first={li === 0}>
@@ -142,9 +151,9 @@
             {#if part.t === 'text'}
               <span class:wj={part.wj}>{part.s}</span>
             {:else if part.t === 'fn'}
-              <button class="marker fn" onclick={() => onStudy('footnotes')} aria-label={t(lang, 'footnotes')}>{String.fromCharCode(97 + (part.i % 26))}</button>
+              <span class="marker fn" role="button" tabindex="0" onclick={() => onStudy('footnotes')} onkeydown={(e) => activate(e, 'footnotes')} aria-label={t(lang, 'footnotes')}>{String.fromCharCode(97 + (part.i % 26))}</span>
             {:else}
-              <button class="marker x" onclick={() => onStudy('xrefs')} aria-label={t(lang, 'irvXrefs')}>✱</button>
+              <span class="marker x" role="button" tabindex="0" onclick={() => onStudy('xrefs')} onkeydown={(e) => activate(e, 'xrefs')} aria-label={t(lang, 'irvXrefs')}>✱</span>
             {/if}
           {/each}
         </span>
@@ -207,7 +216,7 @@
     -webkit-touch-callout: none;
   }
   /* margin: auto centres the verse vertically yet lets a long one scroll from its top. */
-  .body { margin: auto 0; padding: 0 30px; }
+  .body { margin: auto 0; padding: 0 12px; }
   .heading {
     font-size: calc(16px * var(--font-scale));
     color: var(--fg-muted);
@@ -219,11 +228,14 @@
   .lead { margin: 0 0 8px; font-size: calc(15px * var(--font-scale)); }
   .heading, .parallel, .superscription, .lead, .text, .ref { text-align: var(--align, center); }
   .text {
-    font-size: calc(23px * var(--font-scale));
+    /* --fit < 1 only for a verse whose longest word is wider than the column (fit.ts) */
+    font-size: calc(23px * var(--font-scale) * var(--fit, 1));
     line-height: var(--line-height, 1.45);
     color: var(--fg);
-    word-break: normal;
-    overflow-wrap: anywhere;
+    /* never break inside a word */
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: manual;
   }
   .ref {
     margin: 22px 0 0;
@@ -240,6 +252,7 @@
   .line.q, .line.q2, .line.q3, .line.qr { display: block; }
   .text.red .wj { color: var(--wj); }
   .marker {
+    cursor: pointer;
     font-size: 0.5em;
     vertical-align: super;
     color: var(--fg-muted);

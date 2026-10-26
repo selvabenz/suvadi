@@ -90,7 +90,7 @@ export function tap(node: HTMLElement, handlers: TapHandlers) {
       lastTap = 0;
       return;
     }
-    if ((e.target as HTMLElement).closest('button, a, input, textarea')) return;
+    if ((e.target as HTMLElement).closest('button, a, input, textarea, [role="button"]')) return;
     down = { x: e.clientX, y: e.clientY, id: e.pointerId };
     longFired = false;
     clearTimeout(timer);

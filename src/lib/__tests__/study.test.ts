@@ -96,3 +96,19 @@ describe('parseMd', () => {
     expect(b[1].inl).toEqual([{ t: 'text', s: 'Definition' }]);
   });
 });
+
+import { fitScale } from '../fit';
+
+describe('fitScale', () => {
+  it('leaves text that fits alone', () => {
+    expect(fitScale(312, 300)).toBe(1);
+    expect(fitScale(312, 313)).toBe(1);
+    expect(fitScale(0, 500)).toBe(1);
+  });
+  it('shrinks so the widest word fits, never below the floor', () => {
+    const f = fitScale(312, 453);
+    expect(f).toBeLessThan(312 / 453);
+    expect(453 * f).toBeLessThanOrEqual(312);
+    expect(fitScale(100, 1000)).toBe(0.2);
+  });
+});
