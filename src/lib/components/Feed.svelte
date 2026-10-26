@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import type { Book, BookMeta, Lang, Ref, Verse } from '../types';
   import { t } from '../i18n';
+  import { swipe, twoFingerTap } from '../gestures';
   import VerseCard from './VerseCard.svelte';
 
   type Item =
@@ -17,12 +18,18 @@
     lang,
     redLetters,
     showNumbers,
+    showRef,
+    showHeadings,
     isBookmarked,
+    isLiked,
     hasNote,
     onCurrent,
     onNavigate,
+    onStep,
+    onWhatsApp,
     onStudy,
     onBookmark,
+    onLike,
     onNote,
     onShare,
   }: {
@@ -33,12 +40,20 @@
     lang: Lang;
     redLetters: boolean;
     showNumbers: boolean;
+    showRef: boolean;
+    showHeadings: boolean;
     isBookmarked: (r: Ref) => boolean;
+    isLiked: (r: Ref) => boolean;
     hasNote: (r: Ref) => boolean;
     onCurrent: (r: Ref) => void;
     onNavigate: (r: Ref) => void;
+    /** Horizontal swipe: 1 = next chapter (swipe left), -1 = previous (swipe right). */
+    onStep: (dir: 1 | -1) => void;
+    /** Two-finger tap: share the verse on screen on WhatsApp. */
+    onWhatsApp: () => void;
     onStudy: (r: Ref, v: Verse, section?: 'footnotes' | 'xrefs') => void;
     onBookmark: (r: Ref) => void;
+    onLike: (r: Ref) => void;
     onNote: (r: Ref, v: Verse) => void;
     onShare: (r: Ref, v: Verse) => void;
   } = $props();
@@ -110,11 +125,11 @@
   });
 
   function label(ch: number, v: Verse): string {
-    return `${meta.name} ${ch}:${v.id}`;
+    return showRef ? `${meta.name} ${ch}:${v.id}` : meta.name;
   }
 </script>
 
-<div class="feed" bind:this={container}>
+<div class="feed" bind:this={container} use:swipe={{ onSwipe: (d) => onStep(d === 'left' ? 1 : -1) }} use:twoFingerTap={{ onTap: onWhatsApp }}>
   {#each items as item (item.key)}
     {#if item.kind === 'intro'}
       <article class="card intro" data-key="intro">
@@ -144,10 +159,13 @@
           {lang}
           {redLetters}
           {showNumbers}
+          {showHeadings}
           bookmarked={isBookmarked(ref)}
+          liked={isLiked(ref)}
           hasNote={hasNote(ref)}
           onStudy={(section) => onStudy(ref, item.verse, section)}
           onBookmark={() => onBookmark(ref)}
+          onLike={() => onLike(ref)}
           onNote={() => onNote(ref, item.verse)}
           onShare={() => onShare(ref, item.verse)}
         />
@@ -179,6 +197,8 @@
     scroll-snap-type: y mandatory;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    /* The browser pans vertically; horizontal swipes and double taps reach our handlers. */
+    touch-action: pan-y;
   }
   .card {
     height: 100dvh;
@@ -189,10 +209,11 @@
     padding: calc(var(--top-h) + var(--safe-top) + 10px) 20px calc(var(--nav-h) + var(--safe-bottom) + 10px);
     content-visibility: auto;
     contain-intrinsic-size: auto 100dvh;
+    touch-action: pan-y;
   }
   .label { color: var(--fg-muted); font-size: 14px; margin-bottom: 10px; }
   .label .ref { color: var(--accent); font-weight: 700; }
-  .scroll { flex: 1; min-height: 0; overflow-y: auto; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; }
   .scroll.center { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 12px; }
   .intro h3 { color: var(--fg-muted); margin-bottom: 12px; }
   .intro h4 { margin: 14px 0 4px; font-size: calc(16px * var(--font-scale)); color: var(--accent); }

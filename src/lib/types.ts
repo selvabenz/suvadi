@@ -105,5 +105,8 @@ export interface Ref {
   v: number;
 }
 
-export type Theme = 'light' | 'dark' | 'sepia' | 'system';
+export type Theme = 'light' | 'dark' | 'sepia' | 'system' | 'mono' | 'teen' | 'genz';
+export type TextAlign = 'left' | 'center' | 'right' | 'justify';
+/** Bundled Tamil typefaces (public/fonts). */
+export type FontId = 'meera' | 'mukta' | 'pavanam' | 'lohit' | 'tiro';
 export type Lang = 'ta' | 'en';

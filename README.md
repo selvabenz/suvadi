@@ -18,12 +18,12 @@ Live: <https://selvabenz.github.io/suvadi/> (published from `main` by GitHub Act
 
 | Tab | What it does |
 |---|---|
-| **வாசி / Read** | One verse per screen, vertical snap scroll. Section headings and Psalm titles appear above the verse they introduce. Words of Jesus in red (switchable). Footnote and cross-reference markers inline. Study, bookmark, note and share on every verse. Book introductions (the translation's own `\ip` paragraphs) are the first card of each book. |
+| **வாசி / Read** | One verse per screen, vertical snap scroll. Section headings and Psalm titles appear above the verse they introduce. Words of Jesus in red (switchable). Footnote and cross-reference markers inline. Double-tap a verse to like it (red heart); long-press, or tap ⋯, for the icon-only study, bookmark, note and share menu. Swipe left for the next chapter, right for the previous one. Tap with two fingers to share the verse on WhatsApp. Book introductions (the translation's own `\ip` paragraphs) are the first card of each book. |
 | **Study sheet** | For the current verse: heading and parallel passage, the translation's footnotes and its own cross-references (tap to go), OpenBible.info related verses with a text preview, and the Hebrew/Greek words of the verse with transliteration, English gloss, Strong's number and morphology from STEP Bible. |
 | **திட்டம் / Plan** | Four plans computed from the canon: whole Bible in a year, NT in 90 days, Psalms in 30, Gospels in 40. Per-day chapter ranges, mark done, days behind, reading streak. |
-| **சேமித்தவை / Saved** | Bookmarks and notes, stored only on the device. |
+| **சேமித்தவை / Saved** | Bookmarks, liked verses and notes, stored only on the device. |
 | **தேடு / Search** | A typed reference ("யோவா 3:16", "John 3:16") or a substring search over the whole Bible. |
-| **அமைப்புகள் / Settings** | App language (Tamil or English UI), Bible translation (when more than one is shipped), light/sepia/dark/system theme, text size, red letters, verse numbers, credits. |
+| **அமைப்புகள் / Settings** | App language (Tamil or English UI), Bible translation (when more than one is shipped), theme (system, light, sepia, dark, black and white, Teen, Gen Z), text size, text alignment (left, centre, right, justify), red letters, verse numbers, chapter:verse label, section headings, font (Meera Inimai, Mukta Malar, Pavanam, Lohit Tamil, Tiro Tamil), credits. | |
 
 Everything the reader does stays in `localStorage` on the device. There is no
 account, no server and no analytics.
@@ -41,7 +41,7 @@ public/data/<id>/manifest.json book list, book names, chapter/verse counts, lice
 public/data/<id>/books/*.json  66 files per translation: intro, headings, verses, footnotes, cross-references
 public/data/xrefs/*.json       66 files: OpenBible cross-references per verse (top 12 by votes), shared
 public/data/words/*/*.json     1,189 files: STEP words per chapter (loaded on demand), shared
-public/fonts/                  Noto Sans Tamil (variable), OFL
+public/fonts/                  Meera Inimai (regular), OFL
 src/lib/                       data loading, reference parsing, verse layout, plan builder, i18n, state
 src/lib/components/            Feed, VerseCard, Picker, StudySheet, NoteSheet, PlanView, SavedView, SearchView, SettingsView
 src/lib/__tests__/             Vitest tests for refs, plan and layout
@@ -93,7 +93,7 @@ A text that does not follow the English (NRSV) versification the shared study
 data uses should be built with `--no-study`.
 
 What is still single-language: the UI strings (`src/lib/i18n.ts`, Tamil and
-English), the bundled font (Noto Sans Tamil; other scripts fall back to the
+English), the bundled font (Meera Inimai; other scripts fall back to the
 system font), and the typed-reference parser's English book names.
 
 ## Deploy

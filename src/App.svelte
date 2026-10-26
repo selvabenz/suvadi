@@ -39,6 +39,8 @@
   $effect(() => {
     document.documentElement.dataset.theme = app.settings.theme;
     document.documentElement.style.setProperty('--font-scale', String(app.settings.fontScale));
+    document.documentElement.style.setProperty('--align', app.settings.textAlign);
+    document.documentElement.dataset.font = app.settings.font;
     document.documentElement.lang = lang;
   });
 
@@ -122,9 +124,13 @@
     toastTimer = setTimeout(() => (toast = ''), 1800);
   }
 
-  async function share(r: Ref, v: Verse) {
+  function shareText(r: Ref, v: Verse): string {
     const label = formatRef(books, { book: r.book, ch: r.ch, v: v.n }, v.end);
-    const text = `${v.text}\n— ${label} (${manifest?.abbr ?? ''})`.replace(' ()', '');
+    return `${v.text}\n— ${label} (${manifest?.abbr ?? ''})`.replace(' ()', '');
+  }
+
+  async function share(r: Ref, v: Verse) {
+    const text = shareText(r, v);
     try {
       if (navigator.share) {
         await navigator.share({ text });
@@ -140,6 +146,16 @@
     } catch {
       showToast(text.slice(0, 60));
     }
+  }
+
+  /** Two-finger tap on the feed: the verse on screen goes to WhatsApp (app or web). */
+  function whatsapp() {
+    const ch = book?.chapters.find((c) => c.n === current.ch);
+    const v = ch?.verses.find((x) => x.n === current.v) ?? ch?.verses.find((x) => x.n <= current.v && (x.end ?? x.n) >= current.v);
+    if (!v) return;
+    const text = shareText({ book: current.book, ch: current.ch, v: v.n }, v);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    showToast(t(lang, 'whatsapp'));
   }
 
   function retry() {
@@ -165,12 +181,18 @@
         {lang}
         redLetters={app.settings.redLetters}
         showNumbers={app.settings.showNumbers}
+        showRef={app.settings.showRef}
+        showHeadings={app.settings.showHeadings}
         isBookmarked={(r) => app.isBookmarked(r)}
+        isLiked={(r) => app.isLiked(r)}
         hasNote={(r) => !!app.notes[`${r.book}.${r.ch}.${r.v}`]}
         {onCurrent}
         onNavigate={navigate}
+        onStep={step}
+        onWhatsApp={whatsapp}
         onStudy={(r, v, section) => (study = { r, v, section })}
         onBookmark={(r) => app.toggleBookmark(r)}
+        onLike={(r) => app.toggleLike(r)}
         onNote={(r) => (noteFor = r)}
         onShare={share}
       />

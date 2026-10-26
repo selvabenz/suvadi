@@ -1,4 +1,4 @@
-import type { Lang, Ref, Theme } from './types';
+import type { FontId, Lang, Ref, TextAlign, Theme } from './types';
 import { refKey } from './refs';
 import { localDateISO } from './plan';
 import { DEFAULT_TRANSLATION } from './data';
@@ -18,10 +18,15 @@ export interface Settings {
   theme: Theme;
   fontScale: number;   // 0.8 .. 1.6
   redLetters: boolean;
-  showNumbers: boolean;
+  showNumbers: boolean;   // the verse number inside the text
+  showRef: boolean;       // "1:1" after the book name above the verse
+  showHeadings: boolean;  // section headings and parallel-passage lines
+  textAlign: TextAlign;
+  font: FontId;
 }
 
 export interface Bookmark { at: string }
+export interface Like { at: string }
 export interface Note { text: string; at: string }
 export interface PlanProgress { id: string; started: string; done: number[] }
 
@@ -29,6 +34,7 @@ interface Persisted {
   settings: Settings;
   place: Ref;
   bookmarks: Record<string, Bookmark>;
+  likes: Record<string, Like>;
   notes: Record<string, Note>;
   plan: PlanProgress | null;
   readDates: string[];
@@ -36,9 +42,10 @@ interface Persisted {
 }
 
 const DEFAULTS: Persisted = {
-  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true },
+  settings: { lang: 'ta', translation: DEFAULT_TRANSLATION, theme: 'system', fontScale: 1, redLetters: true, showNumbers: true, showRef: true, showHeadings: true, textAlign: 'left', font: 'meera' },
   place: { book: 'JHN', ch: 1, v: 1 },
   bookmarks: {},
+  likes: {},
   notes: {},
   plan: null,
   readDates: [],
@@ -74,6 +81,7 @@ class AppState {
   settings = $state<Settings>(DEFAULTS.settings);
   place = $state<Ref>(DEFAULTS.place);
   bookmarks = $state<Record<string, Bookmark>>({});
+  likes = $state<Record<string, Like>>({});
   notes = $state<Record<string, Note>>({});
   plan = $state<PlanProgress | null>(null);
   readDates = $state<string[]>([]);
@@ -84,6 +92,7 @@ class AppState {
     this.settings = p.settings;
     this.place = p.place;
     this.bookmarks = p.bookmarks;
+    this.likes = p.likes;
     this.notes = p.notes;
     this.plan = p.plan;
     this.readDates = p.readDates;
@@ -96,6 +105,7 @@ class AppState {
         settings: $state.snapshot(this.settings),
         place: $state.snapshot(this.place),
         bookmarks: $state.snapshot(this.bookmarks),
+        likes: $state.snapshot(this.likes),
         notes: $state.snapshot(this.notes),
         plan: $state.snapshot(this.plan),
         readDates: $state.snapshot(this.readDates),
@@ -131,6 +141,20 @@ class AppState {
     if (k in next) delete next[k];
     else next[k] = { at: new Date().toISOString() };
     this.bookmarks = next;
+    this.persist();
+  }
+
+  isLiked(ref: Ref): boolean {
+    return refKey(ref) in this.likes;
+  }
+
+  /** Double-tap on a verse: a red heart. Separate from bookmarks. */
+  toggleLike(ref: Ref) {
+    const k = refKey(ref);
+    const next = { ...this.likes };
+    if (k in next) delete next[k];
+    else next[k] = { at: new Date().toISOString() };
+    this.likes = next;
     this.persist();
   }
 

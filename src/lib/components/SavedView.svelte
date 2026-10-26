@@ -19,6 +19,12 @@
       .filter((r): r is Ref => !!r)
       .sort((a, b) => compareRefs(books, a, b)),
   );
+  const likes = $derived(
+    Object.keys(app.likes)
+      .map(parseRefKey)
+      .filter((r): r is Ref => !!r)
+      .sort((a, b) => compareRefs(books, a, b)),
+  );
   const notes = $derived(
     Object.entries(app.notes)
       .map(([k, n]) => ({ r: parseRefKey(k), n }))
@@ -48,6 +54,23 @@
     </ul>
   {/if}
 
+  <h3><span class="heart">♥</span> {t(lang, 'liked')} ({likes.length})</h3>
+  {#if !likes.length}
+    <p class="muted">{t(lang, 'nothingSaved')}</p>
+  {:else}
+    <ul class="list">
+      {#each likes as r (r.book + r.ch + ':' + r.v)}
+        <li>
+          <button class="row" onclick={() => onNavigate(r)}>
+            <span class="rref">{formatRef(books, r)}</span>
+            <VersePreview {r} {translation} />
+          </button>
+          <button class="del" onclick={() => app.toggleLike(r)} aria-label={t(lang, 'delete')}>✕</button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
   <h3>{t(lang, 'notes')} ({notes.length})</h3>
   {#if !notes.length}
     <p class="muted">{t(lang, 'nothingSaved')}</p>
@@ -69,6 +92,7 @@
 
 <style>
   h3 { margin-top: 18px; }
+  .heart { color: var(--heart); }
   .list { list-style: none; margin: 0; padding: 0; }
   .list li { display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--line); }
   .row { flex: 1; display: block; text-align: left; padding: 10px 0; }
