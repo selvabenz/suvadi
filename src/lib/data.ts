@@ -1,5 +1,6 @@
 import type { AlignChapter, Book, Manifest, OpenXref, Ref, StepWord, TaArticle, TaIndex, TnNote, TranslationInfo, TwArticle, TwIndex, TwlRow, Verse } from './types';
 import { strongBase } from './study';
+import { buildBookIndex, type BookIndex } from './booknames';
 import { ESV_ID, ESV_INFO, esvManifest, loadEsvBook, searchEsv } from './esv';
 import { parseTypedRef } from './refs';
 
@@ -136,6 +137,28 @@ export function loadTwIndex(): Promise<TwIndex> {
 
 export function loadTaIndex(): Promise<TaIndex> {
   return cached(indexCache, 'ta', 'ta/index.json') as Promise<TaIndex>;
+}
+
+/**
+ * Book names of every bundled translation (plus the active one first, which
+ * sets the canon order), so a reference typed in any language resolves. A
+ * manifest that cannot be fetched (offline, not cached yet) is skipped.
+ */
+let bookIndex: Promise<BookIndex> | null = null;
+export function loadBookIndex(active?: Manifest): Promise<BookIndex> {
+  if (!bookIndex) {
+    bookIndex = loadTranslations()
+      .then((list) => Promise.allSettled(list.filter((x) => !isOnline(x.id)).map((x) => loadManifest(x.id))))
+      .then((res) => {
+        const sets = res.flatMap((r) => (r.status === 'fulfilled' ? [r.value.books] : []));
+        return buildBookIndex(active ? [active.books, ...sets] : sets);
+      })
+      .catch((e) => {
+        bookIndex = null;
+        throw e;
+      });
+  }
+  return bookIndex;
 }
 
 /** Strong's base -> Translation Words slugs, built once from the index. */

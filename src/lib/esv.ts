@@ -1,5 +1,5 @@
 import type { Book, BookMeta, Manifest, Ref, TranslationInfo, Verse } from './types';
-import { ENGLISH_NAMES } from './refs';
+import { ENGLISH_NAMES } from './booknames';
 
 // The ESV is © Crossway and may not be bundled with the app. Crossway's ESV
 // API (https://api.esv.org) allows a non-commercial app to show the text with

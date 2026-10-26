@@ -2,9 +2,16 @@
   import type { BookMeta, Lang, Ref } from '../types';
   import { searchAll, type SearchHit } from '../data';
   import { formatRef, parseTypedRef } from '../refs';
+  import type { BookIndex } from '../booknames';
   import { t } from '../i18n';
 
-  let { books, lang, translation, onNavigate }: { books: BookMeta[]; lang: Lang; translation: string; onNavigate: (r: Ref) => void } = $props();
+  let {
+    books,
+    lang,
+    translation,
+    index = null,
+    onNavigate,
+  }: { books: BookMeta[]; lang: Lang; translation: string; index?: BookIndex | null; onNavigate: (r: Ref) => void } = $props();
 
   let query = $state('');
   let hits = $state<SearchHit[] | null>(null);
@@ -13,7 +20,7 @@
   let signal: { cancelled: boolean; skipped?: number } | null = null;
   let skipped = $state(0);
 
-  const typedRef = $derived(parseTypedRef(books, query));
+  const typedRef = $derived(parseTypedRef(books, query, index ?? undefined));
   const tooShort = $derived(query.trim().length < 2);
 
   async function run(e?: Event) {

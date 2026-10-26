@@ -49,7 +49,7 @@ const STRINGS = {
   endOfBible: { ta: 'வேதாகமத்தின் இறுதி வசனம்', en: 'The last verse of the Bible' },
   continueReading: { ta: 'தொடர்ந்து வாசி', en: 'Continue reading' },
   goToRef: { ta: 'வசனக் குறிப்புக்குச் செல்', en: 'Go to a reference' },
-  refPlaceholder: { ta: 'எ.கா. யோவா 3:16 அல்லது John 3:16', en: 'e.g. John 3:16 or யோவா 3:16' },
+  refPlaceholder: { ta: 'எ.கா. யோவா 3:16, Jn 3:16-18, சங்கீதம்', en: 'e.g. John 3:16, Jn 3:16-18, யோவா 3, Psalms' },
   refNotFound: { ta: 'அந்தக் குறிப்பு புரியவில்லை', en: 'That reference was not understood' },
   swipeHint: { ta: 'அடுத்த வசனத்திற்கு மேலே தள்ளவும்', en: 'Swipe up for the next verse' },
 

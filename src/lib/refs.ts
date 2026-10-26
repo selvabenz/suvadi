@@ -1,4 +1,5 @@
 import type { BookMeta, Ref } from './types';
+import { ENGLISH_NAMES, indexFromBooks, resolveBook, type BookIndex } from './booknames';
 
 export function refKey(r: Ref): string {
   return `${r.book}.${r.ch}.${r.v}`;
@@ -57,37 +58,22 @@ export function prevChapter(books: BookMeta[], book: string, ch: number): { book
 }
 
 /**
- * Parse a typed reference such as "யோவா 3:16", "John 3:16", "JHN 3 16", "சங் 23".
- * Matches Tamil names, Tamil abbreviations, USFM codes and a small English list.
+ * Parse a typed reference: "யோவா 3:16", "John 3:16-18", "Jn 3", "I John 1:1",
+ * "சங்கீதம்" (a book alone opens its first verse). Book names come from `index`
+ * (every shipped translation) or, without it, from `books` alone.
+ * A range keeps its first verse.
  */
-export function parseTypedRef(books: BookMeta[], input: string): Ref | null {
+export function parseTypedRef(books: BookMeta[], input: string, index?: BookIndex): Ref | null {
   const s = input.trim().replace(/\s+/g, ' ');
-  const m = /^(.+?)\s+(\d+)(?:[:\s.](\d+))?$/.exec(s);
+  const m = /^(.+?)(?:\s+(\d+)(?:[:\s.](\d+)(?:\s*[-–—]\s*(?:\d+:)?\d+)?)?)?$/.exec(s);
   if (!m) return null;
-  const nameRaw = m[1].replace(/\s/g, '').toLowerCase();
-  const ch = Number(m[2]);
-  const v = m[3] ? Number(m[3]) : 1;
-  const b = books.find((x) => {
-    const cands = [x.code, x.name, x.abbr, x.header, x.long, ENGLISH_NAMES[x.code] ?? '']
-      .map((c) => c.replace(/\s/g, '').toLowerCase())
-      .filter(Boolean);
-    return cands.some((c) => c === nameRaw || c.startsWith(nameRaw) && nameRaw.length >= 2);
-  });
+  const code = resolveBook(index ?? indexFromBooks(books), m[1]);
+  const b = code ? books.find((x) => x.code === code) : undefined;
   if (!b) return null;
+  const ch = m[2] ? Number(m[2]) : 1;
+  const v = m[3] ? Number(m[3]) : 1;
   if (ch < 1 || ch > b.chapters.length) return null;
   return { book: b.code, ch, v: Math.max(1, Math.min(v, b.lastVerse[ch - 1] || 1)) };
 }
 
-export const ENGLISH_NAMES: Record<string, string> = {
-  GEN: 'Genesis', EXO: 'Exodus', LEV: 'Leviticus', NUM: 'Numbers', DEU: 'Deuteronomy', JOS: 'Joshua',
-  JDG: 'Judges', RUT: 'Ruth', '1SA': '1 Samuel', '2SA': '2 Samuel', '1KI': '1 Kings', '2KI': '2 Kings',
-  '1CH': '1 Chronicles', '2CH': '2 Chronicles', EZR: 'Ezra', NEH: 'Nehemiah', EST: 'Esther', JOB: 'Job',
-  PSA: 'Psalms', PRO: 'Proverbs', ECC: 'Ecclesiastes', SNG: 'Song of Songs', ISA: 'Isaiah', JER: 'Jeremiah',
-  LAM: 'Lamentations', EZK: 'Ezekiel', DAN: 'Daniel', HOS: 'Hosea', JOL: 'Joel', AMO: 'Amos', OBA: 'Obadiah',
-  JON: 'Jonah', MIC: 'Micah', NAM: 'Nahum', HAB: 'Habakkuk', ZEP: 'Zephaniah', HAG: 'Haggai', ZEC: 'Zechariah',
-  MAL: 'Malachi', MAT: 'Matthew', MRK: 'Mark', LUK: 'Luke', JHN: 'John', ACT: 'Acts', ROM: 'Romans',
-  '1CO': '1 Corinthians', '2CO': '2 Corinthians', GAL: 'Galatians', EPH: 'Ephesians', PHP: 'Philippians',
-  COL: 'Colossians', '1TH': '1 Thessalonians', '2TH': '2 Thessalonians', '1TI': '1 Timothy', '2TI': '2 Timothy',
-  TIT: 'Titus', PHM: 'Philemon', HEB: 'Hebrews', JAS: 'James', '1PE': '1 Peter', '2PE': '2 Peter',
-  '1JN': '1 John', '2JN': '2 John', '3JN': '3 John', JUD: 'Jude', REV: 'Revelation',
-};
+export { ENGLISH_NAMES };

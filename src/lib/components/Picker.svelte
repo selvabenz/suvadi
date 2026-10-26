@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BookMeta, Lang, Ref } from '../types';
   import { parseTypedRef } from '../refs';
+  import type { BookIndex } from '../booknames';
   import { t } from '../i18n';
   import Sheet from './Sheet.svelte';
 
@@ -10,7 +11,8 @@
     lang,
     onPick,
     onClose,
-  }: { books: BookMeta[]; current: Ref; lang: Lang; onPick: (r: Ref) => void; onClose: () => void } = $props();
+    index = null,
+  }: { books: BookMeta[]; current: Ref; lang: Lang; onPick: (r: Ref) => void; onClose: () => void; index?: BookIndex | null } = $props();
 
   // The picker starts at the reader's current position and then holds its own
   // selection; later prop changes are not meant to move it.
@@ -46,7 +48,7 @@
   }
   function submitTyped(e: Event) {
     e.preventDefault();
-    const r = parseTypedRef(books, typed);
+    const r = parseTypedRef(books, typed, index ?? undefined);
     if (r) onPick(r);
     else typedError = true;
   }

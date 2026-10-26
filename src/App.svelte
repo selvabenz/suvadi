@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Book, Manifest, Ref, Selection, StudySection, TranslationInfo, Verse } from './lib/types';
-  import { DEFAULT_TRANSLATION, getVerse, loadBook, loadManifest, loadTranslations } from './lib/data';
+  import { DEFAULT_TRANSLATION, getVerse, loadBook, loadBookIndex, loadManifest, loadTranslations } from './lib/data';
+  import type { BookIndex } from './lib/booknames';
   import { formatRef, nextChapter, prevChapter, refKey } from './lib/refs';
   import { ask, AiError } from './lib/ai';
   import { t } from './lib/i18n';
@@ -36,6 +37,7 @@
   let picker = $state(false);
   let study = $state<{ r: Ref; v: Verse; section?: StudySection; focus?: Selection | null } | null>(null);
   let toast = $state('');
+  let bookIndex = $state<BookIndex | null>(null);
   let offlineReady = $state(false);
   let loadedFor = DEFAULT_TRANSLATION;   // the translation `manifest` was loaded for
 
@@ -79,6 +81,7 @@
       if (app.settings.translation === ESV_ID && !esvKey()) app.update('translation', DEFAULT_TRANSLATION);
       loadedFor = app.settings.translation;
       manifest = await loadManifest(loadedFor);
+      loadBookIndex(manifest).then((i) => (bookIndex = i)).catch(() => {});
       await navigate(app.place, false);
     } catch {
       loadError = true;
@@ -300,7 +303,7 @@
     {:else if view === 'saved'}
       <SavedView {books} {lang} {translation} onNavigate={navigate} onEditNote={editNote} />
     {:else if view === 'search'}
-      <SearchView {books} {lang} {translation} onNavigate={navigate} />
+      <SearchView {books} {lang} {translation} index={bookIndex} onNavigate={navigate} />
     {:else}
       <SettingsView {lang} {offlineReady} {translations} {manifest} />
     {/if}
@@ -314,7 +317,7 @@
     </nav>
 
     {#if picker}
-      <Picker {books} {current} {lang} onPick={(r) => { picker = false; navigate(r); }} onClose={() => (picker = false)} />
+      <Picker {books} {current} {lang} index={bookIndex} onPick={(r) => { picker = false; navigate(r); }} onClose={() => (picker = false)} />
     {/if}
     {#if study}
       <StudySheet
