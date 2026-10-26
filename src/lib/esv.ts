@@ -34,7 +34,7 @@ export const ESV_INFO: TranslationInfo = {
   abbr: 'ESV',
   publisher: 'Crossway',
   licence: { name: 'ESV API terms, online only', url: 'https://api.esv.org/' },
-  study: { xrefs: true, words: true },
+  study: { xrefs: true, words: true, notes: true },
 };
 
 const BUILD_KEY: string = (import.meta.env.VITE_ESV_API_KEY as string | undefined) ?? '';

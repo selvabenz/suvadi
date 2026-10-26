@@ -24,6 +24,46 @@ Every further translation added to `public/data/` must record its own licence
 in its manifest (the `--licence` and `--licence-url` flags of
 `tools/build_data.py`) and be listed in this file.
 
+## Scripture text: Literal Text (ULT)
+
+Source: the *unfoldingWord® Literal Text*, Copyright © 2026 by unfoldingWord,
+release v91 (https://git.door43.org/unfoldingWord/en_ult). Seven books not yet
+in that release (Numbers, 1 and 2 Chronicles, Ecclesiastes, Isaiah, Jeremiah,
+Ezekiel) were taken from the master branch at commit
+`0e7df04b8e81f0ec70bbe2b91bac5c464e42bb6f` and are marked as drafts in the app.
+SHA-256 of each input file is recorded in `public/data/en-ult/manifest.json`.
+
+Licence: Creative Commons Attribution-ShareAlike 4.0 International.
+"The original work by unfoldingWord is available from unfoldingword.org/ult."
+
+This is a derivative work, so, as the licence requires, the unfoldingWord®
+trademark is not used in its name ("Literal Text (ULT)"). Changes made: the
+word-alignment markup was moved out of the text into side files
+(`public/data/en-ult/align/`); chunk milestones were removed; `{supplied}`
+braces were removed from the text and kept as offsets; footnote alternative
+readings are shown in quotation marks. The derived files carry the same licence.
+
+## Translation Notes, Translation Words, Translation Academy (unfoldingWord)
+
+Sources, all release v91 from https://git.door43.org/unfoldingWord, each
+Copyright © 2026 by unfoldingWord and licensed CC BY-SA 4.0:
+
+- Translation Notes `en_tn` ("The original work by unfoldingWord is available
+  from unfoldingword.org/utn"), plus the seven draft books from master commit
+  `a32ed25e56f62940ffc26c6ddf98e9a9e463827e`;
+- Translation Words `en_tw` and Translation Words Links `en_twl` ("… available
+  from unfoldingword.org/utw"), plus draft links from master commit
+  `b558d3158465284506485042139d04addbf1769b`;
+- Translation Academy `en_ta` ("… available from unfoldingword.org/uta"):
+  only the articles the notes cite.
+
+Derived files: `public/data/tn/`, `twl/`, `tw/`, `ta/`. Changes made: TSV and
+Markdown converted to JSON per chapter; links rewritten to in-app links or
+plain text; book and chapter introductions split into `intro.json`; the
+"Examples from the Bible stories" sections of Translation Words dropped; each
+note's Hebrew/Greek quote resolved to the English words of the ULT it is
+aligned to. They carry the same licence; the attribution is shown in Settings.
+
 ## Cross-references: OpenBible.info
 
 `cross_references.txt`, header `#www.openbible.info CC-BY 2026-10-19`.

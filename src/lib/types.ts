@@ -9,6 +9,8 @@ export interface BookMeta {
   header: string;    // running header (\h)
   chapters: number[];   // verse record count per chapter
   lastVerse: number[];  // highest verse number per chapter
+  /** Taken from an unreleased source commit (some ULT books). */
+  draft?: boolean;
 }
 
 /**
@@ -74,6 +76,8 @@ export interface Verse {
   lead?: string;
   footnotes?: Footnote[];
   xrefs?: Xref[];
+  /** Words the translators supplied (ULT {braces}), as offsets into text. */
+  supplied?: [number, number][];
 }
 
 export interface Chapter {
@@ -122,3 +126,52 @@ export interface Selection {
   end: number;
   text: string;
 }
+
+// unfoldingWord helps (tools/uw_study.py) and the ULT alignment (build_data.py).
+
+/** An original-language word in a ULT verse: [content, strong, morph, occurrence]. */
+export type AlignToken = [string, string, string, number];
+/** An English word of the verse: [start, end, indices into the verse's tokens]. */
+export type AlignSpan = [number, number, number[]];
+export interface AlignVerse {
+  o: AlignToken[];
+  a: AlignSpan[];
+  /** words inside a Psalm title that sits in this verse */
+  d?: AlignSpan[];
+}
+/** align/<CODE>/<ch>.json: "lex" maps a Strong's base to its lemma; other keys are verse numbers ("0" = Psalm title). */
+export type AlignChapter = { lex: Record<string, string> } & Record<string, AlignVerse | Record<string, string>>;
+
+/** A Translation Note. hl/hld are spans in the ULT verse / its title. */
+export interface TnNote {
+  id: string;
+  ta: string;
+  q: string;
+  occ: number;
+  note: string;
+  hl?: [number, number][];
+  hld?: [number, number][];
+  partial?: boolean;
+  ref?: string;
+}
+/** Translation Words link: [origWords, occurrence, slug, category, strong, hl, hld]. */
+export type TwlRow = [string, number, string, 'kt' | 'names' | 'other', string, [number, number][], [number, number][]];
+export interface TwArticle {
+  slug: string;
+  cat: 'kt' | 'names' | 'other';
+  title: string;
+  body: string;
+  see: string[];
+  refs: [string, number, number][];
+  strongs: string[];
+}
+/** slug -> [title, category, strongs] */
+export type TwIndex = Record<string, [string, string, string[]]>;
+export interface TaArticle {
+  id: string;
+  title: string;
+  subtitle: string;
+  body: string;
+}
+/** id -> [title, subtitle] */
+export type TaIndex = Record<string, [string, string]>;

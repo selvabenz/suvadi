@@ -55,11 +55,12 @@ export default defineConfig({
         navigateFallback: `${base}index.html`,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => /\/data\/(xrefs|words)\//.test(url.pathname),
+            // shared study data and the ULT word alignment: cached the first time each file is read
+            urlPattern: ({ url }) => /\/data\/(?:xrefs|words|tn|twl|tw|ta)\/|\/data\/[^/]+\/align\//.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'study-data',
-              expiration: { maxEntries: 2000, maxAgeSeconds: 365 * 24 * 3600 },
+              expiration: { maxEntries: 8000, maxAgeSeconds: 365 * 24 * 3600 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

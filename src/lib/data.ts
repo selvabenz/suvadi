@@ -1,4 +1,5 @@
-import type { Book, Manifest, OpenXref, Ref, StepWord, TranslationInfo, Verse } from './types';
+import type { AlignChapter, Book, Manifest, OpenXref, Ref, StepWord, TaArticle, TaIndex, TnNote, TranslationInfo, TwArticle, TwIndex, TwlRow, Verse } from './types';
+import { strongBase } from './study';
 import { ESV_ID, ESV_INFO, esvManifest, loadEsvBook, searchEsv } from './esv';
 import { parseTypedRef } from './refs';
 
@@ -8,6 +9,11 @@ import { parseTypedRef } from './refs';
 //   <id>/books/<CODE>.json   that translation's text, one file per book
 //   xrefs/<CODE>.json        OpenBible cross-references (shared, English versification)
 //   words/<CODE>/<ch>.json   STEP original-language words (shared)
+//   <id>/align/<CODE>/<ch>.json  word alignment of an aligned text (the ULT)
+//   tn/<CODE>/<ch>.json      unfoldingWord Translation Notes (shared; intro.json per book)
+//   twl/<CODE>/<ch>.json     Translation Words links per verse (shared)
+//   tw/<slug>.json, tw/index.json   Translation Words articles (shared)
+//   ta/<id>.json, ta/index.json     Translation Academy articles the notes cite (shared)
 //
 // Every loader takes the translation id explicitly, so the UI can show two
 // translations side by side later without touching this file.
@@ -22,9 +28,22 @@ const manifestCache = new Map<string, Promise<Manifest>>();
 const bookCache = new Map<string, Promise<Book>>();
 const xrefCache = new Map<string, Promise<Record<string, OpenXref[]>>>();
 const wordsCache = new Map<string, Promise<Record<string, StepWord[]>>>();
+const alignCache = new Map<string, Promise<AlignChapter>>();
+const notesCache = new Map<string, Promise<Record<string, TnNote[]>>>();
+const introCache = new Map<string, Promise<Record<string, string>>>();
+const twlCache = new Map<string, Promise<Record<string, TwlRow[]>>>();
+const twCache = new Map<string, Promise<TwArticle>>();
+const taCache = new Map<string, Promise<TaArticle>>();
+const indexCache = new Map<string, Promise<unknown>>();
+
+class MissingError extends Error {}
+const isMissing = (e: unknown) => e instanceof MissingError;
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(BASE + path);
+  // A chapter with no notes has no file: that is "nothing here", not a failure.
+  // (A dev or preview server answers a missing file with the app's HTML page.)
+  if (res.status === 404 || /text\/html/.test(res.headers.get('content-type') ?? '')) throw new MissingError(`${path}: not found`);
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return (await res.json()) as T;
 }
@@ -77,6 +96,72 @@ export function loadOpenXrefs(code: string): Promise<Record<string, OpenXref[]>>
 
 export function loadWords(code: string, ch: number): Promise<Record<string, StepWord[]>> {
   return cached(wordsCache, `${code}/${ch}`, `words/${code}/${ch}.json`);
+}
+
+/** Does this translation carry Hebrew/Greek word alignment (the ULT)? */
+export function hasAlignment(m: Manifest | null | undefined): boolean {
+  return (m?.source as { text?: { aligned?: boolean } } | undefined)?.text?.aligned === true;
+}
+
+export function loadAlign(translation: string, code: string, ch: number): Promise<AlignChapter> {
+  return cached(alignCache, `${translation}/${code}/${ch}`, `${translation}/align/${code}/${ch}.json`);
+}
+
+const orEmpty = <T,>(p: Promise<T>, empty: T): Promise<T> => p.catch((e) => (isMissing(e) ? empty : Promise.reject(e)));
+
+/** Translation Notes for a chapter (keyed by verse; "0" holds notes on a Psalm title). No file = no notes. */
+export function loadNotes(code: string, ch: number): Promise<Record<string, TnNote[]>> {
+  return orEmpty(cached(notesCache, `${code}/${ch}`, `tn/${code}/${ch}.json`), {});
+}
+
+export function loadNotesIntro(code: string): Promise<Record<string, string>> {
+  return orEmpty(cached(introCache, code, `tn/${code}/intro.json`), {});
+}
+
+export function loadTwl(code: string, ch: number): Promise<Record<string, TwlRow[]>> {
+  return orEmpty(cached(twlCache, `${code}/${ch}`, `twl/${code}/${ch}.json`), {});
+}
+
+export function loadTw(slug: string): Promise<TwArticle> {
+  return cached(twCache, slug, `tw/${slug}.json`);
+}
+
+export function loadTa(id: string): Promise<TaArticle> {
+  return cached(taCache, id, `ta/${id}.json`);
+}
+
+export function loadTwIndex(): Promise<TwIndex> {
+  return cached(indexCache, 'tw', 'tw/index.json') as Promise<TwIndex>;
+}
+
+export function loadTaIndex(): Promise<TaIndex> {
+  return cached(indexCache, 'ta', 'ta/index.json') as Promise<TaIndex>;
+}
+
+/** Strong's base -> Translation Words slugs, built once from the index. */
+let strongMap: Promise<Map<string, string[]>> | null = null;
+export function loadStrongToTw(): Promise<Map<string, string[]>> {
+  if (!strongMap) {
+    strongMap = loadTwIndex()
+      .then((idx) => {
+        const m = new Map<string, string[]>();
+        for (const [slug, [, , strongs]] of Object.entries(idx)) {
+          for (const s of strongs) {
+            const b = strongBase(s);
+            if (!b) continue;
+            const list = m.get(b) ?? [];
+            if (!list.includes(slug)) list.push(slug);
+            m.set(b, list);
+          }
+        }
+        return m;
+      })
+      .catch((e) => {
+        strongMap = null;
+        throw e;
+      });
+  }
+  return strongMap;
 }
 
 /** Find the verse record that contains verse number v (bridges included). */

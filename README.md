@@ -33,6 +33,8 @@ account, no server and no analytics.
 ```
 .github/workflows/deploy.yml   check + test + build on every push to main, publish dist/ to GitHub Pages
 tools/build_data.py            USFM + OpenBible + STEP  ->  public/data/   (Python 3.12, stdlib only)
+tools/uw_study.py              unfoldingWord Translation Notes / Words / Academy  ->  public/data/
+tools/fetch_uw.py              one-time download of the unfoldingWord sources (ULT, tN, tWL, tW, tA)
 tools/migrate_data.py          one-time move of a pre-Suvadi data folder into the per-translation layout
 tools/tests/                   unit tests for the parser (python -m unittest discover -s tools/tests)
 tools/make_icons.ps1           renders public/icons/icon.svg to PNG with headless Edge
@@ -41,6 +43,9 @@ public/data/<id>/manifest.json book list, book names, chapter/verse counts, lice
 public/data/<id>/books/*.json  66 files per translation: intro, headings, verses, footnotes, cross-references
 public/data/xrefs/*.json       66 files: OpenBible cross-references per verse (top 12 by votes), shared
 public/data/words/*/*.json     1,189 files: STEP words per chapter (loaded on demand), shared
+public/data/en-ult/align/      ULT word alignment per chapter: Hebrew/Greek tokens and English spans
+public/data/tn/ twl/           Translation Notes and Words links per chapter, with ULT highlight spans, shared
+public/data/tw/ ta/            Translation Words articles (953) and the Academy articles notes cite, shared
 public/fonts/                  Meera Inimai (regular), OFL
 src/lib/                       data loading, reference parsing, verse layout, plan builder, i18n, state
 src/lib/components/            Feed, VerseCard, Picker, StudySheet, NoteSheet, PlanView, SavedView, SearchView, SettingsView
@@ -72,6 +77,25 @@ python -m unittest discover -s tools/tests -v
 Tamil IRV. Without `--xrefs` or `--step` the shared study files already in
 `public/data/` are kept; if there are none, those sections are hidden.
 Each `manifest.json` records the SHA-256 of every input file.
+
+### The ULT and the unfoldingWord helps
+
+```bash
+python tools/fetch_uw.py --into "D:/Claude Lab/uW"     # v91 zips + 7 draft books, writes SOURCES.json
+python tools/build_data.py --usfm "D:/Claude Lab/uW/en_ult" --id en-ult --lang en --script Latn \
+  --name "Literal Text (ULT)" --name-en "Literal Text (ULT)" --abbr ULT --publisher "" \
+  --licence "CC BY-SA 4.0" --licence-url https://creativecommons.org/licenses/by-sa/4.0/ \
+  --attribution "The original work by unfoldingWord is available from unfoldingword.org/ult" \
+  --changes "Word alignment moved to side files; milestones removed; {supplied} kept as offsets" --release v91 \
+  --tn "D:/Claude Lab/uW/en_tn" --twl "D:/Claude Lab/uW/en_twl" --tw "D:/Claude Lab/uW/en_tw" --ta "D:/Claude Lab/uW/en_ta"
+```
+
+The ULT's word alignment (`\zaln-s … \w …\w* … \zaln-e\*`) is stripped into
+`en-ult/align/`, and each Translation Note's or Words link's Hebrew/Greek quote
+is resolved at build time to the English words it covers, so the reader can
+highlight them without the original-language texts. Notes and Words apply to
+every translation by reference; highlighting needs the ULT. The build then
+refreshes the `study` flags of every translation in `translations.json`.
 
 ### Adding a translation
 

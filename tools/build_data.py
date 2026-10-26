@@ -36,7 +36,9 @@ import collections
 import hashlib
 import json
 import re
+import shutil
 import sys
+import unicodedata
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -76,12 +78,22 @@ OSIS_TO_CODE = {
 
 # Paragraph-level markers the IRV files use, grouped by what the app does with them.
 INTRO_MARKERS = {"is", "ip", "iot", "io1"}
-HEADER_MARKERS = {"id", "ide", "h", "toc1", "toc2", "toc3", "mt"}
-HEADING_MARKERS = {"s", "s1", "r", "ms", "d"}
-TEXT_PARA_MARKERS = {"p", "m", "pi", "b", "nb", "q", "q1", "q2", "q3", "qr"}
+HEADER_MARKERS = {"id", "ide", "h", "toc1", "toc2", "toc3", "mt", "mt1", "usfm"}
+# \qa is the acrostic letter of Psalm 119 (shown as a heading); \ms1 / \cl
+# ("Book One", "Psalm") repeat what the chapter number already says: dropped.
+HEADING_MARKERS = {"s", "s1", "r", "ms", "ms1", "d", "qa"}
+IGNORED_MARKERS = {"cl"}
+TEXT_PARA_MARKERS = {"p", "m", "pi", "b", "nb", "q", "q1", "q2", "q3", "qr", "pm", "pmo", "pmc", "pi1"}
+# How less common paragraph markers are styled: embedded openings/closings are prose.
+PARA_STYLE = {"q1": "q", "pm": "m", "pmo": "m", "pmc": "m", "pi1": "pi"}
 VERSE_MARKER = "v"
 CHAPTER_MARKER = "c"
-KNOWN_PARA = INTRO_MARKERS | HEADER_MARKERS | HEADING_MARKERS | TEXT_PARA_MARKERS | {VERSE_MARKER, CHAPTER_MARKER}
+KNOWN_PARA = INTRO_MARKERS | HEADER_MARKERS | HEADING_MARKERS | TEXT_PARA_MARKERS | IGNORED_MARKERS | {VERSE_MARKER, CHAPTER_MARKER}
+
+# Private-use sentinels left in the text by the aligned-USFM pre-pass and turned
+# into offset ranges by extract_inline: {supplied words} and each aligned \w word.
+SUP_OPEN, SUP_CLOSE = "\uE810", "\uE811"
+WORD_OPEN, WORD_CLOSE = "\uE820", "\uE821"
 
 # Inline (character-level) markers, with how each is handled.
 #   footnote \f ... \f*  -> extracted into verse.footnotes, a marker index kept in text
@@ -115,7 +127,7 @@ def parse_note(kind: str, body: str) -> dict:
     Footnote parts: \\fr reference, \\fq quoted words, \\ft text, \\fp new paragraph.
     Cross-reference parts: \\xo origin reference, \\xt target text.
     """
-    parts = re.split(r"(\\(?:fr|fq|ft|fp|xo|xt)\*?)\s*", body)
+    parts = re.split(r"(\\(?:fr|fqa|fq|ft|fp|xo|xt)\*?)\s*", body)
     out: dict = {"ref": "", "text": "", "quote": ""} if kind == "f" else {"ref": "", "targets": ""}
     current = None
     for piece in parts:
@@ -134,6 +146,9 @@ def parse_note(kind: str, body: str) -> dict:
                 out["ref"] = piece
             elif current == "fq":
                 out["quote"] = (out["quote"] + " " + piece).strip()
+            elif current == "fqa":
+                # an alternative reading inside the note text: keep it, quoted
+                out["text"] = (out["text"] + " \u201c" + piece.rstrip(".") + "\u201d" + ("." if piece.endswith(".") else "")).strip()
             elif current in ("ft", "fp"):
                 sep = "\n" if (current == "fp" and out["text"]) else " "
                 out["text"] = (out["text"] + sep + piece).strip()
@@ -155,7 +170,9 @@ def parse_note(kind: str, body: str) -> dict:
 def extract_inline(raw: str, book_code: str, abbr_map: dict[str, str]) -> dict:
     """Turn a verse's raw USFM text into plain text plus side data.
 
-    Returns {text, wj: [[start,end],...], footnotes: [...], xrefs: [...]}.
+    Returns {text, wj: [[start,end],...], footnotes: [...], xrefs: [...],
+    supplied: [[start,end],...], words: [[start,end],...]} — the last two only
+    carry data for text that went through normalize_aligned_usfm.
     Footnote positions are character offsets into the plain text (where the
     caller sits); cross-reference positions likewise.
     """
@@ -191,8 +208,29 @@ def extract_inline(raw: str, book_code: str, abbr_map: dict[str, str]) -> dict:
     out_chars: list[str] = []
     wj: list[list[int]] = []
     wj_open: int | None = None
+    supplied: list[list[int]] = []
+    sup_open: int | None = None
+    words: list[list[int]] = []
+    word_open: int | None = None
     for ch in s:
         o = ord(ch)
+        if ch == SUP_OPEN:
+            sup_open = len(out_chars)
+            continue
+        if ch == SUP_CLOSE:
+            if sup_open is not None and len(out_chars) > sup_open:
+                supplied.append([sup_open, len(out_chars)])
+            sup_open = None
+            continue
+        if ch == WORD_OPEN:
+            word_open = len(out_chars)
+            continue
+        if ch == WORD_CLOSE:
+            # every aligned word keeps its range, even an empty one, so the
+            # count always matches the alignment table
+            words.append([word_open if word_open is not None else len(out_chars), len(out_chars)])
+            word_open = None
+            continue
         if 0xE000 <= o < 0xE800:
             kind, note = placeholders[o - 0xE000]
             pos = len(out_chars)
@@ -234,6 +272,8 @@ def extract_inline(raw: str, book_code: str, abbr_map: dict[str, str]) -> dict:
             if x["pos"] > i:
                 x["pos"] -= 1
         wj = [[a - (a > i), b - (b > i)] for a, b in wj]
+        supplied = [[a - (a > i), b - (b > i)] for a, b in supplied]
+        words = [[a - (a > i), b - (b > i)] for a, b in words]
     # Offsets may point one past a trailing space that clean_spaces kept; clamp.
     text_stripped = text.rstrip()
     if len(text_stripped) != len(text):
@@ -243,8 +283,10 @@ def extract_inline(raw: str, book_code: str, abbr_map: dict[str, str]) -> dict:
         for x in xrefs:
             x["pos"] = min(x["pos"], n)
         wj = [[a, min(b, n)] for a, b in wj if a < n]
+        supplied = [[a, min(b, n)] for a, b in supplied if a < n]
+        words = [[min(a, n), min(b, n)] for a, b in words]
         text = text_stripped
-    return {"text": text, "wj": wj, "footnotes": footnotes, "xrefs": xrefs}
+    return {"text": text, "wj": wj, "footnotes": footnotes, "xrefs": xrefs, "supplied": supplied, "words": words}
 
 
 # Tamil cross-reference targets look like "யாத் 30:7", "அப் 4:25,26", "ஏசா 63:1-6",
@@ -304,6 +346,184 @@ def parse_tamil_targets(raw: str, book_code: str, abbr_map: dict[str, str]) -> l
     return targets
 
 
+_SENTINELS_RE = re.compile("[" + SUP_OPEN + SUP_CLOSE + WORD_OPEN + WORD_CLOSE + "]")
+
+
+def plain(raw: str) -> str:
+    """Text of a header/heading line: character styles and pre-pass sentinels removed."""
+    return clean_spaces(_SENTINELS_RE.sub("", _STRIP_RE.sub(lambda mm: mm.group(1), raw)))
+
+
+# ---------------------------------------------------------------------------
+# Aligned USFM (unfoldingWord ULT): alignment moved to side data
+# ---------------------------------------------------------------------------
+
+_ZALN_S_RE = r"\\zaln-s\s*\|(?P<attrs>[^\\]*?)\\\*"
+_ZALN_E_RE = r"\\zaln-e\\\*"
+_W_RE = r"\\w\s+(?P<word>[^|\\]*?)(?:\|[^\\]*?)?\\w\*"
+_ALIGN_TOKEN_RE = re.compile(
+    "|".join([
+        f"(?P<zs>{_ZALN_S_RE})",
+        f"(?P<ze>{_ZALN_E_RE})",
+        f"(?P<w>{_W_RE})",
+        r"(?P<c>^\\c\s+(?P<cn>\d+))",
+        r"(?P<v>\\v\s+(?P<vn>\d+))",
+        r"(?P<d>^\\d\b)",
+        r"(?P<brace>[{}])",
+    ]),
+    re.M,
+)
+_ATTR_RE = re.compile(r'(x-[a-z]+)="([^"]*)"')
+# Paragraph markers that start a new line in the joined text (everything else
+# that begins a line, such as \zaln-s, \w, \f, \qs, continues the line before).
+_LINE_START_RE = re.compile(r"^\\(?:%s)(?:\s|$)" % "|".join(sorted(
+    INTRO_MARKERS | HEADER_MARKERS | HEADING_MARKERS | TEXT_PARA_MARKERS | IGNORED_MARKERS | {"c", "v", "li1", "li2"},
+    key=len, reverse=True)))
+_PARA_V_RE = re.compile(r"^(\\(?:q\d?|p|m|pi\d?|pm|pmo|pmc|nb|li\d?))\s+(\\v\s)", re.M)
+
+
+def _strip_alignment(line: str) -> str:
+    """Remove \\zaln markers and keep the words of \\w tokens, as plain text."""
+    line = re.sub(_ZALN_S_RE + "|" + _ZALN_E_RE, "", line)
+    return re.sub(_W_RE, lambda m: m.group("word").strip(), line)
+
+
+def strong_base(s: str) -> str:
+    """One Strong's form across STEP and unfoldingWord: letter + 4 digits (see src/lib/study.ts)."""
+    if not s:
+        return ""
+    s = re.sub(r"^(?:[a-z]+:)+", "", s.strip(), flags=re.I)
+    m = re.search(r"([GH])(\d{1,4})(\d)?[A-Za-z]?$", s, re.I)
+    if not m:
+        return ""
+    return m.group(1).upper() + m.group(2).zfill(4)
+
+
+def normalize_aligned_usfm(text: str) -> tuple[str, dict]:
+    r"""Strip unfoldingWord word alignment out of USFM, keeping it as side data.
+
+    Returns (usfm, table). The USFM has each aligned \w word wrapped in the
+    WORD_OPEN/WORD_CLOSE sentinels and {supplied} braces as SUP_OPEN/SUP_CLOSE,
+    so extract_inline can turn them into offsets. table[(ch, key)] holds, per
+    verse ("1", "2", ... and "0" for a Psalm title before verse 1):
+      orig:  [[content, strong, morph, occurrence], ...]  unique per (content, occurrence)
+      words: [[origIdx, ...], ...]   one entry per \w in document order
+      lex:   {strong_base: lemma}
+    """
+    # 1. drop chunk milestones (wherever they sit); every \v starts a line
+    #    (ZEC has "\p\v 6" and "\ts\*\v 8"); join continuation lines.
+    text = re.sub(r"\\ts\\\*", "", text)
+    text = re.sub(r"[ \t]*(\\v\s)", r"\n\1", text)
+    lines: list[str] = []
+    for line in text.splitlines():
+        st = line.strip()
+        if not st:
+            continue
+        if _LINE_START_RE.match(st) or not lines:
+            lines.append(st)
+        else:
+            lines[-1] = lines[-1] + " " + st
+    # A heading such as the acrostic letter (\qa SAMEKH) may carry an aligned
+    # word; headings are shown as plain text, so their alignment is dropped.
+    lines = [_strip_alignment(ln) if ln.startswith(("\\qa", "\\s", "\\ms", "\\cl", "\\mt", "\\h", "\\toc")) else ln for ln in lines]
+    joined = _PARA_V_RE.sub(lambda m: m.group(1) + "\n" + m.group(2), "\n".join(lines))
+
+    table: dict = {}
+    out: list[str] = []
+    ch = 0
+    key: str | None = None
+    stack: list[int] = []
+    last = 0
+
+    def entry() -> dict:
+        k = (ch, key or "0")
+        if k not in table:
+            table[k] = {"orig": [], "index": {}, "words": [], "lex": {}}
+        return table[k]
+
+    for m in _ALIGN_TOKEN_RE.finditer(joined):
+        kind = m.lastgroup
+        if kind in ("zs", "ze", "w", "brace"):
+            out.append(joined[last:m.start()])
+        else:
+            out.append(joined[last:m.end()])
+        last = m.end()
+        if m.group("c"):
+            ch, key, stack = int(m.group("cn")), None, []
+        elif m.group("v"):
+            key, stack = m.group("vn"), []
+        elif m.group("d"):
+            if key is None:
+                key = "0"
+        elif m.group("zs"):
+            a = dict(_ATTR_RE.findall(m.group("attrs")))
+            e = entry()
+            content = unicodedata.normalize("NFC", a.get("x-content", "")).replace("\u2060", "")
+            occ = int(a.get("x-occurrence") or 1)
+            ident = (content, occ)
+            if ident not in e["index"]:
+                e["index"][ident] = len(e["orig"])
+                e["orig"].append([content, a.get("x-strong", ""), a.get("x-morph", ""), occ])
+                base = strong_base(a.get("x-strong", ""))
+                if base and a.get("x-lemma"):
+                    e["lex"].setdefault(base, unicodedata.normalize("NFC", a["x-lemma"]))
+            stack.append(e["index"][ident])
+        elif m.group("ze"):
+            if stack:
+                stack.pop()
+        elif m.group("w"):
+            entry()["words"].append(list(stack))
+            out.append(WORD_OPEN + m.group("word").strip() + WORD_CLOSE)
+        elif m.group("brace"):
+            out.append(SUP_OPEN if m.group("brace") == "{" else SUP_CLOSE)
+    out.append(joined[last:])
+    usfm = "".join(out)
+    if re.search(r"\\(?:zaln-[se]|w\s)", usfm):
+        raise UsfmError("alignment markup left after the pre-pass")
+    for e in table.values():
+        del e["index"]
+    return usfm, table
+
+
+def build_alignment(book: dict, table: dict) -> tuple[dict, int]:
+    """Pair parsed verses' word ranges with the pre-pass table.
+
+    Returns ({ch: {"lex": {...}, "<v>": {"o", "a", "d"?}, "0"?: {...}}}, mismatches).
+    Spans are [start, end, [origIdx, ...]] into verse.text (or the title).
+    """
+    out: dict = {}
+    bad = 0
+    for chapter in book["chapters"]:
+        c = chapter["n"]
+        chap: dict = {"lex": {}}
+        for v in chapter["verses"]:
+            text_words = v.pop("_words", [])
+            sup_words = v.pop("_sup_words", [])
+            inline = v.pop("_sup_inline", False)
+            if sup_words and not inline:
+                t0 = table.get((c, "0"))
+                if t0 and len(t0["words"]) == len(sup_words):
+                    chap["0"] = {"o": t0["orig"], "a": [[s, e, w] for (s, e), w in zip(sup_words, t0["words"])]}
+                    chap["lex"].update(t0["lex"])
+                elif t0:
+                    bad += 1
+                sup_words = []
+            t = table.get((c, str(v["n"])))
+            if not t:
+                continue
+            words = t["words"]
+            if len(words) != len(sup_words) + len(text_words):
+                bad += 1
+                continue
+            entry = {"o": t["orig"], "a": [[s, e, w] for (s, e), w in zip(text_words, words[len(sup_words):])]}
+            if sup_words:
+                entry["d"] = [[s, e, w] for (s, e), w in zip(sup_words, words[:len(sup_words)])]
+            chap[str(v["n"])] = entry
+            chap["lex"].update(t["lex"])
+        out[c] = chap
+    return out, bad
+
+
 def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
     """Parse one USFM book into the app's book shape."""
     lines = text.splitlines()
@@ -339,6 +559,9 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
         raw_joined = "\n".join(pieces) if poetic else " ".join(pieces)
         data = extract_inline(raw_joined, book["code"], abbr_map)
         verse["text"] = data["text"]
+        if data["supplied"]:
+            verse["supplied"] = data["supplied"]
+        verse["_words"] = data["words"]
         if poetic:
             verse["styles"] = styles
         if data["wj"]:
@@ -367,10 +590,12 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
 
         if marker == "id":
             book["code"] = rest.strip().split()[0][:3].upper()
+        elif marker in IGNORED_MARKERS or marker == "usfm":
+            continue
         elif marker in HEADER_MARKERS:
-            book["names"][marker] = clean_spaces(_STRIP_RE.sub(lambda mm: mm.group(1), rest))
+            book["names"]["mt" if marker == "mt1" else marker] = plain(rest)
         elif marker in INTRO_MARKERS:
-            book["intro"].append({"kind": marker, "text": clean_spaces(_STRIP_RE.sub(lambda mm: mm.group(1), rest))})
+            book["intro"].append({"kind": marker, "text": plain(rest)})
         elif marker == CHAPTER_MARKER:
             close_verse()
             num = int(rest.strip().split()[0])
@@ -379,17 +604,20 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
             pending_heading = {}
             current_style = "p"
         elif marker in HEADING_MARKERS:
-            if marker == "ms":
-                continue  # "அத்தியாயம் N" / "சங்கீதம் N": the chapter number already says this
-            if verse is not None and marker in ("s", "s1", "r"):
+            if marker in ("ms", "ms1"):
+                continue  # "அத்தியாயம் N" / "சங்கீதம் N" / "Book One": the chapter number already says this
+            if verse is not None and marker in ("s", "s1", "r", "qa"):
                 close_verse()
-            key = {"s": "heading", "s1": "heading", "r": "parallel", "d": "superscription"}[marker]
-            val = clean_spaces(_STRIP_RE.sub(lambda mm: mm.group(1), rest))
-            if marker == "d" and verse is not None:
+            key = {"s": "heading", "s1": "heading", "qa": "heading", "r": "parallel", "d": "superscription"}[marker]
+            if marker == "d":
+                sup = extract_inline(rest, book["code"], abbr_map)
+                target = verse if verse is not None else pending_heading
                 # a superscription after verse text (rare) is attached to that verse
-                verse[key] = val
+                target["superscription"] = sup["text"]
+                target["_sup_words"] = sup["words"]
+                target["_sup_inline"] = verse is not None
             else:
-                pending_heading[key] = val
+                pending_heading[key] = plain(rest)
         elif marker == VERSE_MARKER:
             if chapter is None:
                 raise UsfmError(f"line {lineno}: \\v before any \\c")
@@ -406,9 +634,16 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
             if pending_heading:
                 verse.update(pending_heading)
                 pending_heading = {}
+            if vtext.lstrip().startswith("\\d "):
+                # a Psalm title inside verse 1 (aligned USFM): \v 1 \d Of David
+                sup = extract_inline(vtext.lstrip()[3:], book["code"], abbr_map)
+                verse["superscription"] = sup["text"]
+                verse["_sup_words"] = sup["words"]
+                verse["_sup_inline"] = True
+                continue
             verse_raw.append((current_style, vtext))
         elif marker in TEXT_PARA_MARKERS:
-            style = "q" if marker == "q1" else marker
+            style = PARA_STYLE.get(marker, marker)
             if marker == "b":
                 if verse is not None:
                     verse_raw.append(("b", ""))
@@ -420,7 +655,7 @@ def parse_book(text: str, abbr_map: dict[str, str] | None = None) -> dict:
             elif rest.strip():
                 # text before the first verse of a chapter (rare); keep as a headingless lead
                 pending_heading.setdefault("lead", "")
-                pending_heading["lead"] = clean_spaces(pending_heading["lead"] + " " + _STRIP_RE.sub(lambda mm: mm.group(1), rest))
+                pending_heading["lead"] = clean_spaces(pending_heading["lead"] + " " + plain(rest))
     close_verse()
     if not book["code"]:
         raise UsfmError("no \\id line")
@@ -635,6 +870,46 @@ def update_translations(out: Path, info: dict) -> list:
     return entries
 
 
+def refresh_study_flags(out: Path) -> None:
+    """Recompute which shared study data every listed translation can use.
+
+    Run after any build, so a translation built earlier (the IRV) gains the
+    Translation Notes flag without being re-parsed. A translation built with
+    --no-study (other versification) keeps everything off.
+    """
+    has_xrefs = any((out / "xrefs").glob("*.json"))
+    has_words = any((out / "words").glob("*/*.json"))
+    has_notes = any((out / "tn").glob("*/*.json")) and (out / "tw" / "index.json").exists()
+    path = out / "translations.json"
+    if not path.exists():
+        return
+    entries = json.loads(path.read_text(encoding="utf-8"))
+    for e in entries:
+        mpath = out / e["id"] / "manifest.json"
+        if not mpath.exists():
+            continue
+        manifest = json.loads(mpath.read_text(encoding="utf-8"))
+        old = manifest.get("study") or {}
+        off = old.get("off") is True
+        study = {"xrefs": has_xrefs and not off, "words": has_words and not off, "notes": has_notes and not off}
+        if off:
+            study["off"] = True
+        manifest["study"] = study
+        e["study"] = study
+        dump(mpath, manifest)
+    dump(path, entries)
+
+
+def draft_codes(usfm_dir: Path) -> tuple[set[str], str]:
+    """Books taken from an unreleased commit, as recorded by tools/fetch_uw.py."""
+    src = usfm_dir.parent / "SOURCES.json"
+    if not src.exists():
+        return set(), ""
+    info = json.loads(src.read_text(encoding="utf-8")).get(usfm_dir.name, {})
+    codes = {re.sub(r"^\d+-|\.usfm$", "", f).upper() for f in info.get("draftFiles", [])}
+    return codes, info.get("draftRef", "")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--usfm", "--irv", dest="usfm", type=Path, default=Path(r"D:\Claude Lab\IRV Tamil"),
@@ -657,23 +932,34 @@ def main(argv=None) -> int:
     tr.add_argument("--licence-url", default="https://creativecommons.org/licenses/by-sa/4.0/")
     tr.add_argument("--no-study", action="store_true",
                     help="this text does not follow English versification: hide the shared xrefs/words")
+    tr.add_argument("--attribution", default="", help="attribution sentence the licence asks for")
+    tr.add_argument("--changes", default="", help="what was changed from the source (CC BY-SA)")
+    tr.add_argument("--release", default="", help="source release, e.g. v91")
+
+    uw = ap.add_argument_group("unfoldingWord helps (shared; need the aligned ULT in the same run)")
+    uw.add_argument("--tn", type=Path, default=None, help="en_tn folder (tn_<BOOK>.tsv)")
+    uw.add_argument("--twl", type=Path, default=None, help="en_twl folder (twl_<BOOK>.tsv)")
+    uw.add_argument("--tw", type=Path, default=None, help="en_tw folder (bible/kt|names|other)")
+    uw.add_argument("--ta", type=Path, default=None, help="en_ta folder (titles and articles the notes cite)")
     args = ap.parse_args(argv)
 
     if args.inventory:
         inventory(args.usfm)
         return 0
 
-    files = sorted(args.usfm.glob("*.SFM")) + sorted(args.usfm.glob("*.usfm"))
-    if len(files) != 66:
-        print(f"expected 66 books in {args.usfm}, found {len(files)}", file=sys.stderr)
-        return 2
+    all_files = sorted(args.usfm.glob("*.SFM")) + sorted(args.usfm.glob("*.usfm"))
 
     # Pass 1: book names, so cross-reference abbreviations can be resolved.
+    # Files whose \id is not a canon book (front matter) are skipped.
     texts: dict[str, str] = {}
     abbr_map: dict[str, str] = {}
-    for f in files:
+    files = []
+    for f in all_files:
         t = f.read_text(encoding="utf-8-sig")
         code = re.search(r"^\\id (\S+)", t, re.M).group(1)[:3].upper()
+        if code not in CANON:
+            continue
+        files.append(f)
         texts[code] = t
         for mk in ("toc3", "toc2", "h"):
             mm = re.search(r"^\\" + mk + r" (.*)$", t, re.M)
@@ -687,12 +973,31 @@ def main(argv=None) -> int:
     # Pass 2: parse.
     out = args.out
     tdir = out / args.id
+    aligned = any("\\zaln-s" in t for t in texts.values())
+    drafts, draft_ref = draft_codes(args.usfm)
+    align: dict[str, dict] = {}
+    if aligned and (tdir / "align").exists():
+        shutil.rmtree(tdir / "align")
     books_meta = []
     total_verses = 0
     sample = ""
     unresolved = collections.Counter()
     for code in CANON:
-        book = parse_book(texts[code], abbr_map)
+        if aligned:
+            usfm, table = normalize_aligned_usfm(texts[code])
+            book = parse_book(usfm, abbr_map)
+            book_align, bad = build_alignment(book, table)
+            if bad:
+                print(f"  {code}: {bad} verses without alignment (word counts differ)", file=sys.stderr)
+            align[code] = book_align
+            for ch, data in book_align.items():
+                dump(tdir / "align" / code / f"{ch}.json", data)
+        else:
+            book = parse_book(texts[code], abbr_map)
+            for ch in book["chapters"]:
+                for v in ch["verses"]:
+                    for k in ("_words", "_sup_words", "_sup_inline"):
+                        v.pop(k, None)
         if book["code"] != code:
             raise SystemExit(f"{code}: \\id says {book['code']}")
         chapters = [len(ch["verses"]) for ch in book["chapters"]]
@@ -716,6 +1021,7 @@ def main(argv=None) -> int:
             "header": names.get("h") or "",
             "chapters": chapters,
             "lastVerse": last_verse,
+            **({"draft": True} if code in drafts else {}),
         })
         dump(tdir / "books" / f"{code}.json", {
             "code": code,
@@ -736,7 +1042,15 @@ def main(argv=None) -> int:
         "source": {
             "text": {
                 "name": args.name_en,
-                "files": [{"name": f.name, "sha256": sha256_of(f)} for f in files],
+                **({"attribution": args.attribution} if args.attribution else {}),
+                **({"changes": args.changes} if args.changes else {}),
+                **({"release": args.release} if args.release else {}),
+                **({"aligned": True} if aligned else {}),
+                "files": [{
+                    "name": f.name,
+                    "sha256": sha256_of(f),
+                    **({"ref": draft_ref} if re.sub(r"^\d+-|\..*$", "", f.name).upper() in drafts and draft_ref else {}),
+                } for f in files],
             }
         },
     }
@@ -777,14 +1091,34 @@ def main(argv=None) -> int:
     else:
         print("  (no --step given: skipping STEP Bible words)", file=sys.stderr)
 
-    # Which shared study data this translation can use.
-    has_xrefs = (out / "xrefs").is_dir() and any((out / "xrefs").glob("*.json"))
-    has_words = (out / "words").is_dir() and any((out / "words").glob("*/*.json"))
-    manifest["study"] = {"xrefs": has_xrefs and not args.no_study, "words": has_words and not args.no_study}
+    # unfoldingWord Translation Words / Academy / Words Links / Notes (shared)
+    if args.tw or args.tn or args.twl:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import uw_study
+        uw_study.CANON_SET = set(CANON)
+        print("unfoldingWord helps:", file=sys.stderr)
+        if (args.tn or args.twl) and not align:
+            print("  (no aligned ULT in this run: notes are stored without word highlights)", file=sys.stderr)
+        for sub in ("tn", "twl", "tw", "ta"):
+            if getattr(args, sub) and (out / sub).exists():
+                shutil.rmtree(out / sub)
+        ta_titles: dict[str, str] = {}
+        if args.tw:
+            uw_study.build_tw(args.tw, out, dump)
+        if args.ta and args.tn:
+            ta_titles = uw_study.build_ta(args.ta, out, uw_study.ta_ids_in_notes(args.tn), dump)
+        if args.twl:
+            uw_study.build_twl(args.twl, out, align, dump)
+        if args.tn:
+            uw_study.build_tn(args.tn, out, align, ta_titles, dump)
+
+    # Which shared study data this translation can use (refreshed for all below).
+    manifest["study"] = {"off": True} if args.no_study else {}
     info["study"] = manifest["study"]
 
     dump(tdir / "manifest.json", manifest)
     entries = update_translations(out, info)
+    refresh_study_flags(out)
     print(f"wrote {tdir} — {len(books_meta)} books, {total_verses} verses; "
           f"translations.json now lists {[e['id'] for e in entries]}", file=sys.stderr)
     return 0
